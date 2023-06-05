@@ -4,100 +4,100 @@
 
 namespace Portals
 {
-    class Game
+    class Game final
     {
     public:
-        inline Game(DXContext& dxContext)
-        {
-            _dxContext = &dxContext;
-        }
+        Game(DXContext& dxContext, uint32_t width, uint32_t height);
 
-        inline void Update()
-        {
-            static uint64_t frameCounter = 0;
-            static double elapsedSeconds = 0.0;
-            static std::chrono::high_resolution_clock clock;
-            static auto t0 = clock.now();
-
-            ++frameCounter;
-            auto t1 = clock.now();
-            auto deltaTime = t1 - t0;
-            t0 = t1;
-
-            elapsedSeconds += deltaTime.count() * 1e-9;
-            if (elapsedSeconds > 1.0)
-            {
-                char buffer[500];
-                auto fps = frameCounter / elapsedSeconds;
-                sprintf_s(buffer, 500, "FPS: %f\n", fps);
-                OutputDebugStringA(buffer);
-
-                frameCounter = 0;
-                elapsedSeconds = 0.0;
-            }
-        }
-
-        inline void Render()
-        {
-            auto commandAllocator = _dxContext->_commandAllocators[_dxContext->_currentBackBufferIndex];
-            auto backBuffer = _dxContext->_backBuffers[_dxContext->_currentBackBufferIndex];
-
-            commandAllocator->Reset();
-            _dxContext->_commandList->Reset(commandAllocator.Get(), nullptr);
-
-            // Clear the render target.
-            {
-                CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-                    backBuffer.Get(),
-                    D3D12_RESOURCE_STATE_PRESENT,
-                    D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-                _dxContext->_commandList->ResourceBarrier(1, &barrier);
-
-                // TODO: Remove magic numbers
-                FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-
-                // Get descriptor handle of RTV using descriptor heap
-                CD3DX12_CPU_DESCRIPTOR_HANDLE rtv(
-                    _dxContext->_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-                    _dxContext->_currentBackBufferIndex,
-                    _dxContext->_rtvDescriptorSize);
-
-                _dxContext->_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-            }
-
-            // Present
-            {
-                CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-                    backBuffer.Get(),
-                    D3D12_RESOURCE_STATE_RENDER_TARGET,
-                    D3D12_RESOURCE_STATE_PRESENT);
-                _dxContext->_commandList->ResourceBarrier(1, &barrier);
-
-                ThrowIfFailed(_dxContext->_commandList->Close());
-
-                ID3D12CommandList* const commandLists[] = {
-                    _dxContext->_commandList.Get()
-                };
-                _dxContext->_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
-
-                UINT syncInterval = _dxContext->_vSync ? 1 : 0;
-                UINT presentFlags = _dxContext->_tearingSupported && !_dxContext->_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
-                ThrowIfFailed(_dxContext->_swapChain->Present(syncInterval, presentFlags));
-
-                _dxContext->_frameFenceValues[_dxContext->_currentBackBufferIndex] = _dxContext->_Signal(
-                    _dxContext->_commandQueue,
-                    _dxContext->_fence,
-                    _dxContext->_fenceValue);
-
-                // After signaling, back buffer index is updated
-                _dxContext->_currentBackBufferIndex = _dxContext->_swapChain->GetCurrentBackBufferIndex();
-
-                _dxContext->_WaitForFenceValue(_dxContext->_fence, _dxContext->_frameFenceValues[_dxContext->_currentBackBufferIndex], _dxContext->_fenceEvent);
-            }
-        }
+        void Update();
+        void Render();
     
     private:
+
+        struct VertexPosColor
+        {
+            DirectX::XMFLOAT3 Position;
+            DirectX::XMFLOAT3 Color;
+        };
+
+        inline const static VertexPosColor _vertices[8] = {
+            { DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+            { DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
+            { DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
+            { DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
+            { DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
+            { DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
+            { DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
+            { DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
+        };
+
+        inline const static WORD _indicies[36] =
+        {
+            0, 1, 2, 0, 2, 3,
+            4, 6, 5, 4, 7, 6,
+            4, 5, 1, 4, 1, 0,
+            3, 2, 6, 3, 6, 7,
+            1, 5, 6, 1, 6, 2,
+            4, 0, 3, 4, 3, 7
+        };
+
         DXContext* _dxContext;
+        std::vector<uint64_t> _fenceValues;
+
+        void _CreatePipelineState();
+
+        void _ResizeDepthBuffer(int width, int height);
+
+        // Helper functions
+        // Transition a resource
+        void _TransitionResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+            Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+            D3D12_RESOURCE_STATES beforeState,
+            D3D12_RESOURCE_STATES afterState);
+
+        // Clear a render target view
+        void _ClearRTV(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+            D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+            FLOAT* clearColor);
+
+        // Clear the depth of a depth-stencil view
+        void _ClearDepth(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+            D3D12_CPU_DESCRIPTOR_HANDLE dsv,
+            FLOAT depth = 1.0f);
+
+        // Create a GPU buffer
+        void _UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+            ID3D12Resource** pDestinationResource, ID3D12Resource** pIntermediateResource,
+            size_t numElements, size_t elementSize, const void* bufferData,
+            D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+
+        // Vertex buffer
+        Microsoft::WRL::ComPtr<ID3D12Resource> _vertexBuffer;
+        D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
+
+        // Index buffer
+        Microsoft::WRL::ComPtr<ID3D12Resource> _indexBuffer;
+        D3D12_INDEX_BUFFER_VIEW _indexBufferView;
+
+        // Depth buffer
+        Microsoft::WRL::ComPtr<ID3D12Resource> _depthBuffer;
+
+        // Descriptor heap for depth buffer
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+
+        // Root signature
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> _rootSignature;
+
+        // Pipeline state object
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> _pipelineState;
+
+        D3D12_VIEWPORT _viewport;
+        D3D12_RECT _scissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
+
+        float _fov = 45.0f;
+
+        DirectX::XMMATRIX _modelMatrix;
+        DirectX::XMMATRIX _viewMatrix;
+        DirectX::XMMATRIX _projectionMatrix;
     };
 }

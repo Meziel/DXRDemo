@@ -7,34 +7,8 @@ using namespace DirectX;
 
 namespace Portals
 {
-    struct VertexPosColor
-    {
-        XMFLOAT3 Position;
-        XMFLOAT3 Color;
-    };
-
-    static VertexPosColor g_Vertices[8] = {
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-        { XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-        { XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-        { XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-        { XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-        { XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-        { XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
-    };
-
-    static WORD g_Indicies[36] =
-    {
-        0, 1, 2, 0, 2, 3,
-        4, 6, 5, 4, 7, 6,
-        4, 5, 1, 4, 1, 0,
-        3, 2, 6, 3, 6, 7,
-        1, 5, 6, 1, 6, 2,
-        4, 0, 3, 4, 3, 7
-    };
-
-    DXContext::DXContext(const Window & window)
+    DXContext::DXContext(const Window& window, uint32_t numBuffers) :
+        _numBuffers(numBuffers)
     {
         _EnableDebugLayer();
 
@@ -42,52 +16,97 @@ namespace Portals
         _tearingSupported = _CheckTearingSupport();
 
         // Create DirextX 12 objects
-        ComPtr<IDXGIAdapter4> dxgiAdapter4 = _GetAdapter(_useWarp);
+        Adapter = _GetAdapter(_useWarp);
+        Device = _CreateDevice(Adapter);
 
-        _device = _CreateDevice(dxgiAdapter4);
-
-        _commandQueue = _CreateCommandQueue(_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        // Create command queues
+        DirectCommandQueue = std::make_unique<CommandQueue>(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        CopyCommandQueue = std::make_unique<CommandQueue>(Device, D3D12_COMMAND_LIST_TYPE_COPY);
 
         _swapChain = _CreateSwapChain(window.GetHWND(),
-            _commandQueue,
+            DirectCommandQueue->GetD3D12CommandQueue().Get(),
             window.GetWidth(),
             window.GetHeight(),
-            _numFrames);
+            numBuffers);
 
         _currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+        _rtvDescriptorHeap = CreateDescriptorHeap(Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numBuffers);
+        _rtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-        _rtvDescriptorHeap = _CreateDescriptorHeap(_device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, _numFrames);
-        _rtvDescriptorSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-        _UpdateRenderTargetViews(_device, _swapChain, _rtvDescriptorHeap);
-
-        // Command list and command allocators
-        for (int i = 0; i < _numFrames; ++i)
-        {
-            _commandAllocators[i] = _CreateCommandAllocator(_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-        }
-        _commandList = _CreateCommandList(
-            _device,
-            _commandAllocators[_currentBackBufferIndex],
-            D3D12_COMMAND_LIST_TYPE_DIRECT);
-
-        // Create fence
-        _fence = _CreateFence(_device);
-        _fenceEvent = _CreateEventHandle();
+        _UpdateRenderTargetViews();
     }
 
     DXContext::~DXContext()
     {
         // DirectX Cleanup
-        // Make sure the command queue has finished all commands before closing.
-        _Flush(_commandQueue, _fence, _fenceValue, _fenceEvent);
-        ::CloseHandle(_fenceEvent);
+        // Make sure the command queue has finished all commands before closing
+        Flush();
+    }
+
+    void DXContext::Flush()
+    {
+        DirectCommandQueue->Flush();
+        CopyCommandQueue->Flush();
+    }
+
+    UINT DXContext::GetNumberBuffers() const
+    {
+        return _numBuffers;
+    }
+
+    UINT DXContext::GetCurrentBackBufferIndex() const
+    {
+        return _currentBackBufferIndex;
+    }
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> DXContext::GetCurrentBackBuffer() const
+    {
+        return Microsoft::WRL::ComPtr<ID3D12Resource>();
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetCurrentRenderTargetView() const
+    {
+        return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+            _rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+            _currentBackBufferIndex,
+            _rtvDescriptorSize);
+    }
+
+    UINT DXContext::Present()
+    {
+        UINT syncInterval = _vSync ? 1 : 0;
+        UINT presentFlags = _tearingSupported && !_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
+        ThrowIfFailed(_swapChain->Present(syncInterval, presentFlags));
+        _currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+
+        return _currentBackBufferIndex;
+    }
+
+    ComPtr<ID3D12DescriptorHeap> DXContext::CreateDescriptorHeap(
+        ComPtr<ID3D12Device2> device,
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        uint32_t numDescriptors)
+    {
+        ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.NumDescriptors = numDescriptors;
+        desc.Type = type;
+
+        ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
+
+        return descriptorHeap;
+    }
+
+    UINT DXContext::GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const
+    {
+        return Device->GetDescriptorHandleIncrementSize(type);
     }
 
     /// <summary>
-/// Enables errors to be caught by the debug layer when created
-/// DirextX 12 objects
-/// </summary>
+    /// Enables errors to be caught by the debug layer when created
+    /// DirextX 12 objects
+    /// </summary>
     void DXContext::_EnableDebugLayer()
     {
 #if defined(_DEBUG)
@@ -202,27 +221,6 @@ namespace Portals
     }
 
     /// <summary>
-    /// Creates a command queue
-    /// </summary>
-    /// <param name="device"></param>
-    /// <param name="type"></param>
-    /// <returns></returns>
-    ComPtr<ID3D12CommandQueue> DXContext::_CreateCommandQueue(ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type)
-    {
-        ComPtr<ID3D12CommandQueue> d3d12CommandQueue;
-
-        D3D12_COMMAND_QUEUE_DESC desc = {};
-        desc.Type = type;
-        desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-        desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-        desc.NodeMask = 0;
-
-        ThrowIfFailed(device->CreateCommandQueue(&desc, IID_PPV_ARGS(&d3d12CommandQueue)));
-
-        return d3d12CommandQueue;
-    }
-
-    /// <summary>
     /// Checks if variable refresh rate is supported. If it is true is returned; otherwise false.
     /// </summary>
     /// <returns></returns>
@@ -310,128 +308,25 @@ namespace Portals
     }
 
     /// <summary>
-    /// Create Description Heap
-    /// </summary>
-    /// <param name="device"></param>
-    /// <param name="type"></param>
-    /// <param name="numDescriptors"></param>
-    /// <returns></returns>
-    ComPtr<ID3D12DescriptorHeap> DXContext::_CreateDescriptorHeap(
-        ComPtr<ID3D12Device2> device,
-        D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors)
-    {
-        ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-
-        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.NumDescriptors = numDescriptors;
-        desc.Type = type;
-
-        ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
-
-        return descriptorHeap;
-    }
-
-    /// <summary>
     /// Update Render Target Views
     /// </summary>
     /// <param name="device"></param>
     /// <param name="swapChain"></param>
     /// <param name="descriptorHeap"></param>
-    void DXContext::_UpdateRenderTargetViews(
-        ComPtr<ID3D12Device2> device,
-        ComPtr<IDXGISwapChain4> swapChain,
-        ComPtr<ID3D12DescriptorHeap> descriptorHeap)
+    void DXContext::_UpdateRenderTargetViews()
     {
-        auto rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-        for (int i = 0; i < _numFrames; ++i)
+        for (uint32_t i = 0; i < _numBuffers; ++i)
         {
             ComPtr<ID3D12Resource> backBuffer;
-            ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+            ThrowIfFailed(_swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
-            device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
+            Device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
 
             _backBuffers[i] = backBuffer;
 
-            rtvHandle.Offset(rtvDescriptorSize);
+            rtvHandle.Offset(_rtvDescriptorSize);
         }
-    }
-
-    ComPtr<ID3D12CommandAllocator> DXContext::_CreateCommandAllocator(
-        ComPtr<ID3D12Device2> device,
-        D3D12_COMMAND_LIST_TYPE type)
-    {
-        ComPtr<ID3D12CommandAllocator> commandAllocator;
-        ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(&commandAllocator)));
-
-        return commandAllocator;
-    }
-
-    ComPtr<ID3D12GraphicsCommandList> DXContext::_CreateCommandList(
-        ComPtr<ID3D12Device2> device,
-        ComPtr<ID3D12CommandAllocator> commandAllocator,
-        D3D12_COMMAND_LIST_TYPE type)
-    {
-        ComPtr<ID3D12GraphicsCommandList> commandList;
-        ThrowIfFailed(device->CreateCommandList(0, type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
-
-        ThrowIfFailed(commandList->Close());
-
-        return commandList;
-    }
-
-    ComPtr<ID3D12Fence> DXContext::_CreateFence(ComPtr<ID3D12Device2> device)
-    {
-        ComPtr<ID3D12Fence> fence;
-
-        ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
-
-        return fence;
-    }
-
-    HANDLE DXContext::_CreateEventHandle()
-    {
-        HANDLE fenceEvent;
-
-        fenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-        assert(fenceEvent && "Failed to create fence event.");
-
-        return fenceEvent;
-    }
-
-    uint64_t DXContext::_Signal(
-        ComPtr<ID3D12CommandQueue> commandQueue,
-        ComPtr<ID3D12Fence> fence,
-        uint64_t& fenceValue)
-    {
-        uint64_t fenceValueForSignal = ++fenceValue;
-        ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValueForSignal));
-
-        return fenceValueForSignal;
-    }
-
-    void DXContext::_WaitForFenceValue(
-        ComPtr<ID3D12Fence> fence,
-        uint64_t fenceValue,
-        HANDLE fenceEvent,
-        std::chrono::milliseconds duration)
-    {
-        if (fence->GetCompletedValue() < fenceValue)
-        {
-            ThrowIfFailed(fence->SetEventOnCompletion(fenceValue, fenceEvent));
-            ::WaitForSingleObject(fenceEvent, static_cast<DWORD>(duration.count()));
-        }
-    }
-
-    void DXContext::_Flush(
-        ComPtr<ID3D12CommandQueue> commandQueue,
-        ComPtr<ID3D12Fence> fence,
-        uint64_t& fenceValue,
-        HANDLE fenceEvent)
-    {
-        uint64_t fenceValueForSignal = _Signal(commandQueue, fence, fenceValue);
-        _WaitForFenceValue(fence, fenceValueForSignal, fenceEvent);
     }
 }

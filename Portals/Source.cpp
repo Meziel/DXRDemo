@@ -25,11 +25,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    Window window(hInstance, L"Portals", 1280, 720);
+    const uint32_t width = 1280;
+    const uint32_t height = 720;
 
-    DXContext dxContext(window);
-
-    Game game(dxContext);
+    Window window(hInstance, L"Portals", width, height);
+    DXContext dxContext(window, 3);
+    Game game(dxContext, width, height);
 
     Window::OnPaintCallback onPaintCallback = [&game]() {
         game.Update();

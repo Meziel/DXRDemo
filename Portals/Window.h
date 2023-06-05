@@ -59,18 +59,18 @@ namespace Portals
             return _height;
         }
 
-        void SetInitialized(bool initialized)
+        inline void SetInitialized(bool initialized)
         {
             _initialized = initialized;
         }
 
-        void ShowWindow(bool showWindow)
+        inline void ShowWindow(bool showWindow)
         {
             ::ShowWindow(_hWnd, showWindow);
             ::UpdateWindow(_hWnd);
         }
 
-        int32_t Run()
+        inline int32_t Run()
         {
             HACCEL hAccelTable = LoadAccelerators(_hInstance, MAKEINTRESOURCE(IDC_PORTALS));
             MSG msg;
