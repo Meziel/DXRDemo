@@ -12,6 +12,8 @@ namespace Portals
     {
         _EnableDebugLayer();
 
+        _backBuffers.resize(numBuffers);
+
         // Initialize
         _tearingSupported = _CheckTearingSupport();
 
@@ -61,7 +63,7 @@ namespace Portals
 
     Microsoft::WRL::ComPtr<ID3D12Resource> DXContext::GetCurrentBackBuffer() const
     {
-        return Microsoft::WRL::ComPtr<ID3D12Resource>();
+        return _backBuffers[_currentBackBufferIndex];
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetCurrentRenderTargetView() const
