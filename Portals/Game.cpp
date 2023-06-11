@@ -6,6 +6,8 @@
 
 #include "DXRHelper.h"
 #include "DRXUtils/BottomLevelASGenerator.h"
+#include "DRXUtils/RaytracingPipelineGenerator.h"
+#include "DRXUtils/RootSignatureGenerator.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -254,6 +256,10 @@ namespace DRXDemo
         // Setup the acceleration structures (AS) for raytracing. When setting up
         // geometry, each bottom-level AS has its own transform matrix.
         CreateAccelerationStructures();
+        // Create the raytracing pipeline, associating the shader code to symbol names
+        // and to their root signatures, and defining the amount of memory carried by
+        // rays (ray payload)
+        CreateRaytracingPipeline();
     }
 
     void Game::_ResizeDepthBuffer(int width, int height)
@@ -465,5 +471,71 @@ namespace DRXDemo
         
         // Store the AS buffers. The rest of the buffers will be released once we exit the function
         m_bottomLevelAS = bottomLevelBuffers.pResult;
+    }
+
+    ComPtr<ID3D12RootSignature> Game::CreateRayGenSignature()
+    {
+        nv_helpers_dx12::RootSignatureGenerator rsc;
+        rsc.AddHeapRangesParameter({
+            {
+                0 /*u0*/,
+                1 /*1 descriptor */,
+                0 /*use the implicit register space 0*/,
+                D3D12_DESCRIPTOR_RANGE_TYPE_UAV /* UAV representing the output buffer*/,
+                0 /*heap slot where the UAV is defined*/
+            },
+            {
+                0 /*t0*/,
+                1,
+                0,
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV /*Top-level acceleration structure*/,
+                1} 
+            });
+        return rsc.Generate(_dxContext->Device.Get(), true);
+    }
+
+    ComPtr<ID3D12RootSignature> Game::CreateHitSignature()
+    {
+        nv_helpers_dx12::RootSignatureGenerator rsc;
+        return rsc.Generate(_dxContext->Device.Get(), true);
+    }
+
+    ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
+    {
+        nv_helpers_dx12::RootSignatureGenerator rsc;
+        return rsc.Generate(_dxContext->Device.Get(), true);
+    }
+
+    void Game::CreateRaytracingPipeline()
+    {
+        // To be used, each DX12 shader needs a root signature defining which
+        // parameters and buffers will be accessed.
+        m_rayGenSignature = CreateRayGenSignature();
+        m_missSignature = CreateMissSignature();
+        m_hitSignature = CreateHitSignature();
+
+        m_rayGenLibrary = nv_helpers_dx12::CompileShaderLibrary(L"RayGen.hlsl");
+        m_missLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Miss.hlsl");
+        m_hitLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Hit.hlsl");
+
+        nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext->Device.Get());
+
+        pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
+        pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
+        pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit" });
+
+        pipeline.AddHitGroup(L"HitGroup", L"ClosestHit");
+
+        pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), {L"RayGen"});
+        pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss"});
+        pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), {L"HitGroup"});
+
+        pipeline.SetMaxPayloadSize(4 * sizeof(float)); // RGB + distance
+
+        pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
+
+        pipeline.SetMaxRecursionDepth(1);
+
+        m_rtStateObject = pipeline.Generate();
     }
 }

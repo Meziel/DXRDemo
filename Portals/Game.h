@@ -2,6 +2,7 @@
 
 #include "DXContext.h"
 #include "DRXUtils/TopLevelASGenerator.h"
+#include "dxcapi.h"
 
 namespace DRXDemo
 {
@@ -134,5 +135,22 @@ namespace DRXDemo
         
         /// Create all acceleration structures, bottom and top
         void CreateAccelerationStructures();
+
+        // DXR
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRayGenSignature();
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateHitSignature();
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateMissSignature();
+        void CreateRaytracingPipeline();
+        Microsoft::WRL::ComPtr<IDxcBlob> m_rayGenLibrary;
+        Microsoft::WRL::ComPtr<IDxcBlob> m_hitLibrary;
+        Microsoft::WRL::ComPtr<IDxcBlob> m_missLibrary;
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rayGenSignature;
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> m_hitSignature;
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> m_missSignature;
+        // Ray tracing pipeline state
+        Microsoft::WRL::ComPtr<ID3D12StateObject> m_rtStateObject;
+        // Ray tracing pipeline state properties, retaining the shader identifiers
+        // to use in the Shader Binding Table
+        Microsoft::WRL::ComPtr<ID3D12StateObjectProperties> m_rtStateObjectProps;
     };
 }
