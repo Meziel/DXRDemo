@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <queue>
 
-namespace Portals
+namespace DRXDemo
 {
     class CommandQueue final
     {
@@ -17,8 +17,8 @@ namespace Portals
         CommandQueue& operator=(CommandQueue&&) noexcept = delete;
         ~CommandQueue();
 
-        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> GetCommandList();
-        uint64_t ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList);
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> GetCommandList(ID3D12PipelineState* pipelineState = nullptr);
+        uint64_t ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList);
         uint64_t Signal();
         bool IsFenceComplete(uint64_t fenceValue) const;
         void WaitForFenceValue(uint64_t fenceValue) const;
@@ -28,7 +28,7 @@ namespace Portals
     private:
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _GetCommandAllocator();
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _CreateCommandAllocator();
-        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> _CreateCommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator);
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> _CreateCommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator, ID3D12PipelineState* pipelineState = nullptr);
     
         struct CommandAllocatorEntry
         {
@@ -40,7 +40,7 @@ namespace Portals
         D3D12_COMMAND_LIST_TYPE                     _commandListType;
         Microsoft::WRL::ComPtr<ID3D12CommandQueue>  _d3d12CommandQueue;
         std::queue<CommandAllocatorEntry>           _commandAllocators;
-        std::queue<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2>> _commandLists;
+        std::queue<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4>> _commandLists;
 
         // Signaling
         Microsoft::WRL::ComPtr<ID3D12Fence>         _fence;

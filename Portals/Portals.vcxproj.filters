@@ -12,6 +12,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{bf2847e0-0a38-49e6-8bd7-a1b582cf2e0e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\DRXUtils">
+      <UniqueIdentifier>{f70c9d6b-5491-44fa-a8f4-c194c002db4c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -38,9 +41,27 @@
     <ClInclude Include="CommandQueue.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="DRXUtils\BottomLevelASGenerator.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="DRXUtils\DXRHelper.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="DRXUtils\RaytracingPipelineGenerator.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="DRXUtils\RootSignatureGenerator.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="DRXUtils\ShaderBindingTableGenerator.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="DRXUtils\TopLevelASGenerator.h">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source.cpp">
+    <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DXContext.cpp">
@@ -50,6 +71,24 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CommandQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DRXUtils\BottomLevelASGenerator.cpp">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="DRXUtils\RaytracingPipelineGenerator.cpp">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="DRXUtils\RootSignatureGenerator.cpp">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="DRXUtils\ShaderBindingTableGenerator.cpp">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="DRXUtils\TopLevelASGenerator.cpp">
+      <Filter>Source Files\DRXUtils</Filter>
+    </ClCompile>
+    <ClCompile Include="Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

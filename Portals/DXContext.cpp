@@ -5,7 +5,7 @@
 using namespace Microsoft::WRL;
 using namespace DirectX;
 
-namespace Portals
+namespace DRXDemo
 {
     DXContext::DXContext(const Window& window, uint32_t numBuffers) :
         _numBuffers(numBuffers)
@@ -25,16 +25,19 @@ namespace Portals
         DirectCommandQueue = std::make_unique<CommandQueue>(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
         CopyCommandQueue = std::make_unique<CommandQueue>(Device, D3D12_COMMAND_LIST_TYPE_COPY);
 
+        // Create swap chain
         _swapChain = _CreateSwapChain(window.GetHWND(),
             DirectCommandQueue->GetD3D12CommandQueue().Get(),
             window.GetWidth(),
             window.GetHeight(),
             numBuffers);
-
         _currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
+        
+        // Create RTV descriptor heap
         _rtvDescriptorHeap = CreateDescriptorHeap(Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numBuffers);
         _rtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+        // Create render target views
         _UpdateRenderTargetViews();
     }
 
@@ -43,6 +46,26 @@ namespace Portals
         // DirectX Cleanup
         // Make sure the command queue has finished all commands before closing
         Flush();
+    }
+
+    void DXContext::SetVSync(bool enabled)
+    {
+        _vSyncEnabled = enabled;
+    }
+
+    bool DXContext::IsVSyncEnabled() const
+    {
+        return _vSyncEnabled;
+    }
+
+    void DXContext::SetRaytracing(bool enabled)
+    {
+        _raytracingEnabled = enabled;
+    }
+
+    bool DXContext::IsRaytracingEnabled() const
+    {
+        return _raytracingEnabled;
     }
 
     void DXContext::Flush()
@@ -76,8 +99,8 @@ namespace Portals
 
     UINT DXContext::Present()
     {
-        UINT syncInterval = _vSync ? 1 : 0;
-        UINT presentFlags = _tearingSupported && !_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
+        UINT syncInterval = _vSyncEnabled ? 1 : 0;
+        UINT presentFlags = _tearingSupported && !_vSyncEnabled ? DXGI_PRESENT_ALLOW_TEARING : 0;
         ThrowIfFailed(_swapChain->Present(syncInterval, presentFlags));
         _currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
 
@@ -103,6 +126,13 @@ namespace Portals
     UINT DXContext::GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const
     {
         return Device->GetDescriptorHandleIncrementSize(type);
+    }
+
+    bool DXContext::IsRaytracingSupported()
+    {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
+        ThrowIfFailed(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
+        return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
     }
 
     /// <summary>
@@ -136,7 +166,6 @@ namespace Portals
 
         ThrowIfFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
-
         ComPtr<IDXGIAdapter1> dxgiAdapter1;
         ComPtr<IDXGIAdapter4> dxgiAdapter4;
 
@@ -159,7 +188,7 @@ namespace Portals
                 // is favored.
                 if ((dxgiAdapterDesc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
                     SUCCEEDED(D3D12CreateDevice(dxgiAdapter1.Get(),
-                        D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)) &&
+                        D3D_FEATURE_LEVEL_12_1, __uuidof(ID3D12Device), nullptr)) &&
                     dxgiAdapterDesc1.DedicatedVideoMemory > maxDedicatedVideoMemory)
                 {
                     maxDedicatedVideoMemory = dxgiAdapterDesc1.DedicatedVideoMemory;
@@ -176,19 +205,19 @@ namespace Portals
     /// </summary>
     /// <param name="adapter"></param>
     /// <returns></returns>
-    ComPtr<ID3D12Device2> DXContext::_CreateDevice(ComPtr<IDXGIAdapter4> adapter)
+    ComPtr<ID3D12Device5> DXContext::_CreateDevice(ComPtr<IDXGIAdapter4> adapter)
     {
-        ComPtr<ID3D12Device2> d3d12Device2;
-        ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3d12Device2)));
+        ComPtr<ID3D12Device5> d3d12Device5;
+        ThrowIfFailed(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3d12Device5)));
 
         // Enable debug messages in debug mode.
 #if defined(_DEBUG)
         ComPtr<ID3D12InfoQueue> pInfoQueue;
-        if (SUCCEEDED(d3d12Device2.As(&pInfoQueue)))
+        if (SUCCEEDED(d3d12Device5.As(&pInfoQueue)))
         {
-            pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-            pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
-            pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
+            //pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+            //pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+            //pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
 
 
             // Suppress whole categories of messages
@@ -215,11 +244,11 @@ namespace Portals
             NewFilter.DenyList.NumIDs = _countof(DenyIds);
             NewFilter.DenyList.pIDList = DenyIds;
 
-            ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
+            //ThrowIfFailed(pInfoQueue->PushStorageFilter(&NewFilter));
         }
 #endif
 
-        return d3d12Device2;
+        return d3d12Device5;
     }
 
     /// <summary>

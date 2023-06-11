@@ -4,17 +4,21 @@
 #include <chrono>
 #include <d3dcompiler.h>
 
+#include "DXRHelper.h"
+#include "DRXUtils/BottomLevelASGenerator.h"
+
 using namespace DirectX;
 using namespace Microsoft::WRL;
 
-namespace Portals
+namespace DRXDemo
 {
-    Game::Game(DXContext& dxContext, uint32_t width, uint32_t height) :
+    Game::Game(Window& window, DXContext& dxContext, uint32_t width, uint32_t height) :
+        _window(&window),
         _dxContext(&dxContext),
         _viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
     {
         _fenceValues.resize(dxContext.GetNumberBuffers());
-        _CreatePipelineState();
+        _Init();
     }
 
     void Game::Update()
@@ -58,31 +62,34 @@ namespace Portals
     void Game::Render()
     {
         CommandQueue& directCommandQueue = *_dxContext->DirectCommandQueue;
-        auto directCommandList = directCommandQueue.GetCommandList();
+        auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
         
         UINT currentBackBufferIndex = _dxContext->GetCurrentBackBufferIndex();
         auto backBuffer = _dxContext->GetCurrentBackBuffer();
         auto rtv = _dxContext->GetCurrentRenderTargetView();
         auto dsv = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
         
+        // Indicate that the back buffer will be used as a render target
+        _TransitionResource(directCommandList, backBuffer,
+            D3D12_RESOURCE_STATE_PRESENT,
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
+
         // Clear the render targets
         {
-            _TransitionResource(directCommandList, backBuffer,
-                D3D12_RESOURCE_STATE_PRESENT,
-                D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-            FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-
-            _ClearRTV(directCommandList, rtv, clearColor);
+            _ClearRTV(directCommandList, rtv, _clearColor);
             _ClearDepth(directCommandList, dsv);
         }
 
-        directCommandList->SetPipelineState(_pipelineState.Get());
+        //directCommandList->SetPipelineState(_pipelineState.Get());
         directCommandList->SetGraphicsRootSignature(_rootSignature.Get());
 
-        directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        directCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
-        directCommandList->IASetIndexBuffer(&_indexBufferView);
+        // Raster only
+        if (!_dxContext->IsRaytracingEnabled())
+        {
+            directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            directCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
+            directCommandList->IASetIndexBuffer(&_indexBufferView);
+        }
 
         directCommandList->RSSetViewports(1, &_viewport);
         directCommandList->RSSetScissorRects(1, &_scissorRect);
@@ -96,21 +103,40 @@ namespace Portals
 
         directCommandList->DrawIndexedInstanced(_countof(_indicies), 1, 0, 0, 0);
 
+        // Indicate that the back buffer will now be used to present
+        _TransitionResource(directCommandList, backBuffer,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PRESENT);
+
         // Present
+         _fenceValues[_dxContext->GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
+         _dxContext->Present();
+         directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext->GetCurrentBackBufferIndex()]);
+    }
+
+    void Game::OnKeyUp(uint8_t key)
+    {
+    }
+
+    void Game::OnKeyDown(uint8_t key)
+    {
+        switch (key)
         {
-            _TransitionResource(directCommandList, backBuffer,
-                D3D12_RESOURCE_STATE_RENDER_TARGET,
-                D3D12_RESOURCE_STATE_PRESENT);
-
-            _fenceValues[_dxContext->GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
-
-            _dxContext->Present();
-
-            directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext->GetCurrentBackBufferIndex()]);
+            case 'V':
+                _dxContext->SetVSync(!_dxContext->IsVSyncEnabled());
+                break;
+            case VK_SPACE:
+                _dxContext->SetRaytracing(!_dxContext->IsRaytracingEnabled());
+                break;
+            case VK_ESCAPE:
+                _window->Quit();
+                break;
+            default:
+                break;
         }
     }
 
-    void Game::_CreatePipelineState()
+    void Game::_Init()
     {
         auto device = _dxContext->Device;
         CommandQueue& copyCommandQueue = *_dxContext->CopyCommandQueue;
@@ -224,6 +250,10 @@ namespace Portals
 
         // Resize/Create the depth buffer.
         _ResizeDepthBuffer(static_cast<int>(_viewport.Width), static_cast<int>(_viewport.Height));
+
+        // Setup the acceleration structures (AS) for raytracing. When setting up
+        // geometry, each bottom-level AS has its own transform matrix.
+        CreateAccelerationStructures();
     }
 
     void Game::_ResizeDepthBuffer(int width, int height)
@@ -266,7 +296,7 @@ namespace Portals
     }
 
     // Transition a resource
-    void Game::_TransitionResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+    void Game::_TransitionResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
         Microsoft::WRL::ComPtr<ID3D12Resource> resource,
         D3D12_RESOURCE_STATES beforeState,
         D3D12_RESOURCE_STATES afterState)
@@ -279,15 +309,15 @@ namespace Portals
     }
 
     void Game::_ClearRTV(
-        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
         D3D12_CPU_DESCRIPTOR_HANDLE rtv,
-        FLOAT* clearColor)
+        const FLOAT* clearColor)
     {
         commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     }
 
     void Game::_ClearDepth(
-        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList,
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
         D3D12_CPU_DESCRIPTOR_HANDLE dsv,
         FLOAT depth)
     {
@@ -295,7 +325,7 @@ namespace Portals
     }
 
     void Game::_UpdateBufferResource(
-        ComPtr<ID3D12GraphicsCommandList2> commandList,
+        ComPtr<ID3D12GraphicsCommandList4> commandList,
         ID3D12Resource** pDestinationResource,
         ID3D12Resource** pIntermediateResource,
         size_t numElements, size_t elementSize, const void* bufferData,
@@ -338,5 +368,102 @@ namespace Portals
                 *pDestinationResource, *pIntermediateResource,
                 0, 0, 1, &subresourceData);
         }
+    }
+
+    //-----------------------------------------------------------------------------
+    //
+    // Create a bottom-level acceleration structure based on a list of vertex
+    // buffers in GPU memory along with their vertex count. The build is then done
+    // in 3 steps: gathering the geometry, computing the sizes of the required
+    // buffers, and building the actual AS
+    //
+    Game::AccelerationStructureBuffers Game::CreateBottomLevelAS(
+        ComPtr<ID3D12GraphicsCommandList4> commandList,
+        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers)
+    {
+        nv_helpers_dx12::BottomLevelASGenerator bottomLevelAS; // Adding all vertex buffers and not transforming their position.
+        for (const auto &buffer : vVertexBuffers)
+        {
+            bottomLevelAS.AddVertexBuffer(buffer.first.Get(), 0, buffer.second, sizeof(VertexPosColor), 0, 0);
+        }
+            
+        // The AS build requires some scratch space to store temporary information.
+        // The amount of scratch memory is dependent on the scene complexity.
+        UINT64 scratchSizeInBytes = 0;
+            
+        // The final AS also needs to be stored in addition to the existing vertex
+        // buffers. It size is also dependent on the scene complexity.
+        UINT64 resultSizeInBytes = 0;
+        bottomLevelAS.ComputeASBufferSizes(_dxContext->Device.Get(), false, &scratchSizeInBytes, &resultSizeInBytes);
+            
+        // Once the sizes are obtained, the application is responsible for allocating
+        // the necessary buffers. Since the entire generation will be done on the GPU,
+        // we can directly allocate those on the default heap
+        AccelerationStructureBuffers buffers;
+        buffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, nv_helpers_dx12::kDefaultHeapProps);
+        buffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+            
+        // Build the acceleration structure. Note that this call integrates a barrier
+        // on the generated AS, so that it can be used to compute a top-level AS right
+        // after this method.
+        bottomLevelAS.Generate(commandList.Get(), buffers.pScratch.Get(), buffers.pResult.Get(), false, nullptr);
+        return buffers;
+    }
+
+    void Game::CreateTopLevelAS(
+        ComPtr<ID3D12GraphicsCommandList4> commandList,
+        const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances)
+    {
+        // Gather all the instances into the builder helper
+        for (size_t i = 0; i < instances.size(); i++)
+        {
+            m_topLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(0));
+        }
+        // As for the bottom-level AS, the building the AS requires some scratch space
+        // to store temporary data in addition to the actual AS. In the case of the
+        // top-level AS, the instance descriptors also need to be stored in GPU
+        // memory. This call outputs the memory requirements for each (scratch,
+        // results, instance descriptors) so that the application can allocate the
+        // corresponding memory  
+        UINT64 scratchSize, resultSize, instanceDescsSize;
+        m_topLevelASGenerator.ComputeASBufferSizes(_dxContext->Device.Get(), true, &scratchSize, &resultSize, &instanceDescsSize);
+
+        // Create the scratch and result buffers. Since the build is all done on GPU,
+        // those can be allocated on the default heap
+        m_topLevelASBuffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nv_helpers_dx12::kDefaultHeapProps);
+        m_topLevelASBuffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+        
+        // The buffer describing the instances: ID, shader binding information,
+        // matrices ... Those will be copied into the buffer by the helper through
+        // mapping, so the buffer has to be allocated on the upload heap.
+        m_topLevelASBuffers.pInstanceDesc = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), instanceDescsSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+        
+        // After all the buffers are allocated, or if only an update is required, we
+        // can build the acceleration structure. Note that in the case of the update
+        // we also pass the existing AS as the 'previous' AS, so that it can be
+        // refitted in place.
+        m_topLevelASGenerator.Generate(commandList.Get(), m_topLevelASBuffers.pScratch.Get(), m_topLevelASBuffers.pResult.Get(), m_topLevelASBuffers.pInstanceDesc.Get());
+    }
+
+    /// Create all acceleration structures, bottom and top
+    void Game::CreateAccelerationStructures()
+    {
+        CommandQueue& directCommandQueue = *_dxContext->DirectCommandQueue;
+        auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
+
+        // Build the bottom AS from the Triangle vertex buffer
+        AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(directCommandList, { {_vertexBuffer.Get(), static_cast<uint32_t>(_countof(_vertices))}});
+        
+        // Just one instance for now
+        m_instances = {{bottomLevelBuffers.pResult, XMMatrixIdentity()}}; 
+        CreateTopLevelAS(directCommandList, m_instances);
+        
+        // Flush the command list and wait for it to finish
+
+        auto fenceValue = directCommandQueue.ExecuteCommandList(directCommandList);
+        directCommandQueue.WaitForFenceValue(fenceValue);
+        
+        // Store the AS buffers. The rest of the buffers will be released once we exit the function
+        m_bottomLevelAS = bottomLevelBuffers.pResult;
     }
 }

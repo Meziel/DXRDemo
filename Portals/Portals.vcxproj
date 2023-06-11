@@ -136,6 +136,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CommandQueue.h" />
+    <ClInclude Include="DRXUtils\BottomLevelASGenerator.h" />
+    <ClInclude Include="DRXUtils\DXRHelper.h" />
+    <ClInclude Include="DRXUtils\RaytracingPipelineGenerator.h" />
+    <ClInclude Include="DRXUtils\RootSignatureGenerator.h" />
+    <ClInclude Include="DRXUtils\ShaderBindingTableGenerator.h" />
+    <ClInclude Include="DRXUtils\TopLevelASGenerator.h" />
     <ClInclude Include="DXContext.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Game.h" />
@@ -146,9 +152,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="DRXUtils\BottomLevelASGenerator.cpp" />
+    <ClCompile Include="DRXUtils\RaytracingPipelineGenerator.cpp" />
+    <ClCompile Include="DRXUtils\RootSignatureGenerator.cpp" />
+    <ClCompile Include="DRXUtils\ShaderBindingTableGenerator.cpp" />
+    <ClCompile Include="DRXUtils\TopLevelASGenerator.cpp" />
     <ClCompile Include="DXContext.cpp" />
     <ClCompile Include="Game.cpp" />
-    <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Portals.rc" />

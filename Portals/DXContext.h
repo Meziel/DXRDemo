@@ -14,7 +14,7 @@
 #include "Window.h"
 #include "CommandQueue.h"
 
-namespace Portals
+namespace DRXDemo
 {
     class DXContext
     {
@@ -27,9 +27,15 @@ namespace Portals
         ~DXContext();
 
         Microsoft::WRL::ComPtr<IDXGIAdapter4> Adapter;
-        Microsoft::WRL::ComPtr<ID3D12Device2> Device;
+        Microsoft::WRL::ComPtr<ID3D12Device5> Device;
         std::unique_ptr<CommandQueue> DirectCommandQueue;
         std::unique_ptr<CommandQueue> CopyCommandQueue;
+
+        void SetVSync(bool enabled);
+        bool IsVSyncEnabled() const;
+
+        void SetRaytracing(bool enabled);
+        bool IsRaytracingEnabled() const;
 
         void Flush();
         UINT GetNumberBuffers() const;
@@ -42,6 +48,8 @@ namespace Portals
             D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors);
         UINT GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
 
+        bool IsRaytracingSupported();
+
     private:
 
         bool _useWarp = false;
@@ -52,14 +60,15 @@ namespace Portals
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _rtvDescriptorHeap;
         UINT _rtvDescriptorSize;
 
-        bool _vSync = true;
+        bool _vSyncEnabled = true;
+        bool _raytracingEnabled = false;
         bool _tearingSupported = false;
 
         void _EnableDebugLayer();
         
         Microsoft::WRL::ComPtr<IDXGIAdapter4> _GetAdapter(bool useWarp);
         
-        Microsoft::WRL::ComPtr<ID3D12Device2> _CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
+        Microsoft::WRL::ComPtr<ID3D12Device5> _CreateDevice(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
         
         bool _CheckTearingSupport();
         

@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <stdexcept>
 
-namespace Portals
+namespace DRXDemo
 {
     inline void ThrowIfFailed(HRESULT hr)
     {

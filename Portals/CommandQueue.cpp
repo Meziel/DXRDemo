@@ -4,7 +4,7 @@
 
 using namespace Microsoft::WRL;
 
-namespace Portals
+namespace DRXDemo
 {
     CommandQueue::CommandQueue(Microsoft::WRL::ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type) :
         _device(device),
@@ -33,10 +33,10 @@ namespace Portals
         ::CloseHandle(_fenceEvent);
     }
 
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> CommandQueue::GetCommandList()
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> CommandQueue::GetCommandList(ID3D12PipelineState* pipelineState)
     {
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = _GetCommandAllocator();
-        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList;
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList;
 
         // Reuse in object pool if possible
         if (!_commandLists.empty())
@@ -44,11 +44,11 @@ namespace Portals
             commandList = _commandLists.front();
             _commandLists.pop();
 
-            ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
+            ThrowIfFailed(commandList->Reset(commandAllocator.Get(), pipelineState));
         }
         else
         {
-            commandList = _CreateCommandList(commandAllocator);
+            commandList = _CreateCommandList(commandAllocator, pipelineState);
         }
 
         // Associate the command allocator with the command list so that it can be
@@ -58,7 +58,7 @@ namespace Portals
         return commandList;
     }
 
-    uint64_t CommandQueue::ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList)
+    uint64_t CommandQueue::ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList)
     {
         ThrowIfFailed(commandList->Close());
 
@@ -146,10 +146,10 @@ namespace Portals
         return commandAllocator;
     }
 
-    ComPtr<ID3D12GraphicsCommandList2> CommandQueue::_CreateCommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator)
+    ComPtr<ID3D12GraphicsCommandList4> CommandQueue::_CreateCommandList(Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator, ID3D12PipelineState* pipelineState)
     {
-        ComPtr<ID3D12GraphicsCommandList2> commandList;
-        ThrowIfFailed(_device->CreateCommandList(0, _commandListType, allocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
+        ComPtr<ID3D12GraphicsCommandList4> commandList;
+        ThrowIfFailed(_device->CreateCommandList(0, _commandListType, allocator.Get(), pipelineState, IID_PPV_ARGS(&commandList)));
 
         return commandList;
     }

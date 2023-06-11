@@ -1,6 +1,3 @@
-// Portals.cpp : Defines the entry point for the application.
-//
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -12,7 +9,7 @@
 #include "Game.h"
 #include "DXContext.h"
 
-using namespace Portals;
+using namespace DRXDemo;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -28,16 +25,34 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     const uint32_t width = 1280;
     const uint32_t height = 720;
 
-    Window window(hInstance, L"Portals", width, height);
+    Window window(hInstance, L"DRX Demo", width, height);
     DXContext dxContext(window, 3);
-    Game game(dxContext, width, height);
 
+    if (!dxContext.IsRaytracingSupported())
+    {
+        assert("Raytracing not supported on device");
+        return EXIT_FAILURE;
+    }
+
+    Game game(window, dxContext, width, height);
+
+    // TODO: move to game
     Window::OnPaintCallback onPaintCallback = [&game]() {
         game.Update();
         game.Render();
     };
 
+    Window::OnKeyboardCallback onKeyboardDownCallback = [&game](uint8_t key) {
+        game.OnKeyDown(key);
+    };
+
+    Window::OnKeyboardCallback onKeyboardUpCallback = [&game](uint8_t key) {
+        game.OnKeyUp(key);
+    };
+
     window.SubscribeOnPaint(onPaintCallback);
+    window.SubscribeOnKeyDown(onKeyboardDownCallback);
+    window.SubscribeOnKeyUp(onKeyboardUpCallback);
 
     window.SetInitialized(true);
     window.ShowWindow(true);
@@ -45,6 +60,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Cleanup
     window.UnsubscribeOnPaint(onPaintCallback);
+    window.UnsubscribeOnKeyDown(onKeyboardDownCallback);
+    window.UnsubscribeOnKeyUp(onKeyboardUpCallback);
 
     return EXIT_SUCCESS;
 }
