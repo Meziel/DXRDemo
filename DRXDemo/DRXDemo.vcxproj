@@ -22,8 +22,9 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{46cf5c7c-7bb3-4982-ba41-aaf31b97b9ec}</ProjectGuid>
-    <RootNamespace>Portals</RootNamespace>
+    <RootNamespace>DRXDemo</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>DRXDemo</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -163,10 +164,10 @@
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Portals.rc" />
+    <ResourceCompile Include="DRXDemo.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Portals.ico" />
+    <Image Include="DRXDemo.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>

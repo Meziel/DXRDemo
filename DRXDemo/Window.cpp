@@ -30,7 +30,7 @@ namespace DRXDemo
 
     int32_t Window::Run()
     {
-        HACCEL hAccelTable = LoadAccelerators(_hInstance, MAKEINTRESOURCE(IDC_PORTALS));
+        HACCEL hAccelTable = LoadAccelerators(_hInstance, MAKEINTRESOURCE(IDC_DRXDEMO));
         MSG msg;
 
         while (GetMessage(&msg, nullptr, 0, 0))
@@ -79,10 +79,10 @@ namespace DRXDemo
         wcex.cbClsExtra = 0;
         wcex.cbWndExtra = 0;
         wcex.hInstance = _hInstance;
-        wcex.hIcon = LoadIcon(_hInstance, MAKEINTRESOURCE(IDI_PORTALS));
+        wcex.hIcon = LoadIcon(_hInstance, MAKEINTRESOURCE(IDI_DRXDEMO));
         wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-        wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_PORTALS);
+        wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_DRXDEMO);
         wcex.lpszClassName = _windowClass.c_str();
         wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 

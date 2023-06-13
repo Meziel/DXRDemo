@@ -93,7 +93,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Portals.rc">
+    <ResourceCompile Include="DRXDemo.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -101,7 +101,7 @@
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Portals.ico">
+    <Image Include="DRXDemo.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
