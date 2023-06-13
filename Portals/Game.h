@@ -49,7 +49,7 @@ namespace DRXDemo
         DXContext* _dxContext;
         std::vector<uint64_t> _fenceValues;
 
-        void _Init();
+        void _OnInit();
 
         void _ResizeDepthBuffer(int width, int height);
 
@@ -152,5 +152,12 @@ namespace DRXDemo
         // Ray tracing pipeline state properties, retaining the shader identifiers
         // to use in the Shader Binding Table
         Microsoft::WRL::ComPtr<ID3D12StateObjectProperties> m_rtStateObjectProps;
+
+        // Allocate the buffer storing the raytracing output, with the same dimensions
+        // as the target image
+        void CreateRaytracingOutputBuffer();
+        void CreateShaderResourceHeap();
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_outputResource;
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvUavHeap;
     };
 }

@@ -20,7 +20,7 @@ namespace DRXDemo
         _viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
     {
         _fenceValues.resize(dxContext.GetNumberBuffers());
-        _Init();
+        _OnInit();
     }
 
     void Game::Update()
@@ -138,7 +138,7 @@ namespace DRXDemo
         }
     }
 
-    void Game::_Init()
+    void Game::_OnInit()
     {
         auto device = _dxContext->Device;
         CommandQueue& copyCommandQueue = *_dxContext->CopyCommandQueue;
@@ -253,13 +253,10 @@ namespace DRXDemo
         // Resize/Create the depth buffer.
         _ResizeDepthBuffer(static_cast<int>(_viewport.Width), static_cast<int>(_viewport.Height));
 
-        // Setup the acceleration structures (AS) for raytracing. When setting up
-        // geometry, each bottom-level AS has its own transform matrix.
         CreateAccelerationStructures();
-        // Create the raytracing pipeline, associating the shader code to symbol names
-        // and to their root signatures, and defining the amount of memory carried by
-        // rays (ray payload)
         CreateRaytracingPipeline();
+        CreateRaytracingOutputBuffer();
+        CreateShaderResourceHeap();
     }
 
     void Game::_ResizeDepthBuffer(int width, int height)
@@ -538,5 +535,46 @@ namespace DRXDemo
 
         m_rtStateObject = pipeline.Generate();
         ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));
+    }
+
+    void Game::CreateRaytracingOutputBuffer()
+    {
+        D3D12_RESOURCE_DESC resDesc = {};
+        resDesc.DepthOrArraySize = 1;
+        resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        // The backbuffer is actually DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, but sRGB formats cannot be used
+        // with UAVs. For accuracy we should convert to sRGB ourselves in the shader
+        resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+        resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        resDesc.Width = static_cast<uint64_t>(_viewport.Width);
+        resDesc.Height = static_cast<uint64_t>(_viewport.Height);
+        resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resDesc.MipLevels = 1;
+        resDesc.SampleDesc.Count = 1;
+        ThrowIfFailed(_dxContext->Device->CreateCommittedResource(
+            &nv_helpers_dx12::kDefaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_outputResource)));
+    }
+
+    void Game::CreateShaderResourceHeap()
+    {
+        m_srvUavHeap = nv_helpers_dx12::CreateDescriptorHeap(_dxContext->Device.Get(), 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_srvUavHeap->GetCPUDescriptorHandleForHeapStart();
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        _dxContext->Device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &uavDesc, srvHandle);
+
+        srvHandle.ptr += _dxContext->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.RaytracingAccelerationStructure.Location = m_topLevelASBuffers.pResult->GetGPUVirtualAddress();
+
+        _dxContext->Device->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
     }
 }
