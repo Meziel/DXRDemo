@@ -64,7 +64,7 @@ RayTracingPipelineGenerator::RayTracingPipelineGenerator(ID3D12Device5* device)
 // Add a DXIL library to the pipeline. Note that this library has to be
 // compiled with dxc, using a lib_6_3 target. The exported symbols must correspond exactly to the
 // names of the shaders declared in the library, although unused ones can be omitted.
-void RayTracingPipelineGenerator::AddLibrary(IDxcBlob* dxilLibrary,
+void RayTracingPipelineGenerator::AddLibrary(ID3DBlob* dxilLibrary,
                                              const std::vector<std::wstring>& symbolExports)
 {
   m_libraries.emplace_back(Library(dxilLibrary, symbolExports));
@@ -434,7 +434,7 @@ void RayTracingPipelineGenerator::BuildShaderExportList(std::vector<std::wstring
 //
 // Store data related to a DXIL library: the library itself, the exported symbols, and the
 // associated descriptors
-RayTracingPipelineGenerator::Library::Library(IDxcBlob* dxil,
+RayTracingPipelineGenerator::Library::Library(ID3DBlob* dxil,
                                               const std::vector<std::wstring>& exportedSymbols)
     : m_dxil(dxil), m_exportedSymbols(exportedSymbols), m_exports(exportedSymbols.size())
 {

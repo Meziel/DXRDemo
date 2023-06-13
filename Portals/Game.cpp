@@ -514,9 +514,9 @@ namespace DRXDemo
         m_missSignature = CreateMissSignature();
         m_hitSignature = CreateHitSignature();
 
-        m_rayGenLibrary = nv_helpers_dx12::CompileShaderLibrary(L"RayGen.hlsl");
-        m_missLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Miss.hlsl");
-        m_hitLibrary = nv_helpers_dx12::CompileShaderLibrary(L"Hit.hlsl");
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//RayGen.cso", &m_rayGenLibrary));
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Miss.cso", &m_missLibrary));
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Hit.cso", &m_hitLibrary));
 
         nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext->Device.Get());
 
@@ -537,5 +537,6 @@ namespace DRXDemo
         pipeline.SetMaxRecursionDepth(1);
 
         m_rtStateObject = pipeline.Generate();
+        ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));
     }
 }

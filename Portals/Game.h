@@ -141,9 +141,9 @@ namespace DRXDemo
         Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateHitSignature();
         Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateMissSignature();
         void CreateRaytracingPipeline();
-        Microsoft::WRL::ComPtr<IDxcBlob> m_rayGenLibrary;
-        Microsoft::WRL::ComPtr<IDxcBlob> m_hitLibrary;
-        Microsoft::WRL::ComPtr<IDxcBlob> m_missLibrary;
+        Microsoft::WRL::ComPtr<ID3DBlob> m_rayGenLibrary;
+        Microsoft::WRL::ComPtr<ID3DBlob> m_hitLibrary;
+        Microsoft::WRL::ComPtr<ID3DBlob> m_missLibrary;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rayGenSignature;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_hitSignature;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_missSignature;
