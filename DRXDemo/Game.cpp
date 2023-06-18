@@ -138,6 +138,7 @@ namespace DRXDemo
             desc.Height = static_cast<UINT>(_viewport.Height);
             desc.Depth = 1;
             directCommandList->SetPipelineState1(m_rtStateObject.Get());
+            directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(_clearColor) / 4, _clearColor, 0);
             directCommandList->DispatchRays(&desc);
 
             // Copy RT output image to render target
@@ -302,6 +303,7 @@ namespace DRXDemo
         // Resize/Create the depth buffer.
         _ResizeDepthBuffer(static_cast<int>(_viewport.Width), static_cast<int>(_viewport.Height));
 
+        CreateGlobalConstantBuffer();
         CreateAccelerationStructures();
         CreateRaytracingPipeline();
         CreateRaytracingOutputBuffer();
@@ -551,6 +553,7 @@ namespace DRXDemo
     ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV);
         return rsc.Generate(_dxContext->Device.Get(), true);
     }
 
@@ -636,8 +639,8 @@ namespace DRXDemo
         D3D12_GPU_DESCRIPTOR_HANDLE srvUavHeapHandle = m_srvUavHeap->GetGPUDescriptorHandleForHeapStart();
         auto heapPointer = reinterpret_cast<void*>(srvUavHeapHandle.ptr);
         m_sbtHelper.AddRayGenerationProgram(L"RayGen", { heapPointer });
-        m_sbtHelper.AddMissProgram(L"Miss", {});
-        m_sbtHelper.AddHitGroup(L"HitGroup", { (void*)(_vertexBuffer->GetGPUVirtualAddress()) });
+        m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(m_globalConstantBuffer->GetGPUVirtualAddress()) });
+        m_sbtHelper.AddHitGroup(L"HitGroup", { reinterpret_cast<void*>(_vertexBuffer->GetGPUVirtualAddress()) });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
         m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
@@ -647,5 +650,22 @@ namespace DRXDemo
         }
 
         m_sbtHelper.Generate(m_sbtStorage.Get(), m_rtStateObjectProps.Get());
+    }
+
+    void Game::CreateGlobalConstantBuffer()
+    {        
+        // Create our buffer
+        m_globalConstantBuffer = nv_helpers_dx12::CreateBuffer(
+            _dxContext->Device.Get(),
+            sizeof(_clearColor),
+            D3D12_RESOURCE_FLAG_NONE,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nv_helpers_dx12::kUploadHeapProps);
+        
+        // Copy CPU memory to GPU
+        uint8_t* pData;
+        ThrowIfFailed(m_globalConstantBuffer->Map(0, nullptr, (void**)&pData));
+        memcpy(pData, _clearColor, sizeof(_clearColor));
+        m_globalConstantBuffer->Unmap(0, nullptr);
     }
 }

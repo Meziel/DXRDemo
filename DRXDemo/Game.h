@@ -106,7 +106,7 @@ namespace DRXDemo
         D3D12_RECT _scissorRect = CD3DX12_RECT(0, 0, LONG_MAX, LONG_MAX);
 
         float _fov = 45.0f;
-        const float _clearColor[4] = { 0.4f, 0.6f, 0.9f, 1.0f };
+        float _clearColor[4] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
         DirectX::XMMATRIX _modelMatrix;
         DirectX::XMMATRIX _viewMatrix;
@@ -169,5 +169,8 @@ namespace DRXDemo
         void CreateShaderBindingTable();
         nv_helpers_dx12::ShaderBindingTableGenerator m_sbtHelper;
         Microsoft::WRL::ComPtr<ID3D12Resource> m_sbtStorage;
+
+        void CreateGlobalConstantBuffer();
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_globalConstantBuffer;
     };
 }

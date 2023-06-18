@@ -3,7 +3,7 @@
 struct STriVertex
 {
     float3 vertex;
-    float4 color;
+    float3 color;
 };
 StructuredBuffer<STriVertex> BTriVertex : register(t0);
 
