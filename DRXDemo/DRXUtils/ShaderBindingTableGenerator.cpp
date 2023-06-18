@@ -90,9 +90,9 @@ uint32_t ShaderBindingTableGenerator::ComputeSBTSize()
 
   // The total SBT size is the sum of the entries for ray generation, miss and hit groups, aligned
   // on 256 bytes
-  uint32_t sbtSize = ROUND_UP(m_rayGenEntrySize * static_cast<UINT>(m_rayGen.size()) +
-                                  m_missEntrySize * static_cast<UINT>(m_miss.size()) +
-                                  m_hitGroupEntrySize * static_cast<UINT>(m_hitGroup.size()),
+  uint32_t sbtSize = ROUND_UP(ROUND_UP(GetRayGenSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) +
+                              ROUND_UP(GetMissSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) +
+                              ROUND_UP(GetHitGroupSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT),
                               256);
   return sbtSize;
 }
@@ -117,10 +117,10 @@ void ShaderBindingTableGenerator::Generate(ID3D12Resource* sbtBuffer,
   uint32_t offset = 0;
 
   offset = CopyShaderData(raytracingPipeline, pData, m_rayGen, m_rayGenEntrySize);
-  pData += offset;
+  pData += ROUND_UP(offset, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
   offset = CopyShaderData(raytracingPipeline, pData, m_miss, m_missEntrySize);
-  pData += offset;
+  pData += ROUND_UP(offset, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
   offset = CopyShaderData(raytracingPipeline, pData, m_hitGroup, m_hitGroupEntrySize);
 

@@ -2,6 +2,7 @@
 
 #include "DXContext.h"
 #include "DRXUtils/TopLevelASGenerator.h"
+#include "DRXUtils/ShaderBindingTableGenerator.h"
 #include "dxcapi.h"
 
 namespace DRXDemo
@@ -159,5 +160,9 @@ namespace DRXDemo
         void CreateShaderResourceHeap();
         Microsoft::WRL::ComPtr<ID3D12Resource> m_outputResource;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvUavHeap;
+
+        void CreateShaderBindingTable();
+        nv_helpers_dx12::ShaderBindingTableGenerator m_sbtHelper;
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_sbtStorage;
     };
 }

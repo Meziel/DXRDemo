@@ -11,6 +11,7 @@
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
+using namespace nv_helpers_dx12;
 
 namespace DRXDemo
 {
@@ -70,45 +71,93 @@ namespace DRXDemo
         auto backBuffer = _dxContext->GetCurrentBackBuffer();
         auto rtv = _dxContext->GetCurrentRenderTargetView();
         auto dsv = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
-        
-        // Indicate that the back buffer will be used as a render target
-        _TransitionResource(directCommandList, backBuffer,
-            D3D12_RESOURCE_STATE_PRESENT,
-            D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        // Clear the render targets
-        {
-            _ClearRTV(directCommandList, rtv, _clearColor);
-            _ClearDepth(directCommandList, dsv);
-        }
-
-        //directCommandList->SetPipelineState(_pipelineState.Get());
         directCommandList->SetGraphicsRootSignature(_rootSignature.Get());
-
-        // Raster only
-        if (!_dxContext->IsRaytracingEnabled())
-        {
-            directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            directCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
-            directCommandList->IASetIndexBuffer(&_indexBufferView);
-        }
-
         directCommandList->RSSetViewports(1, &_viewport);
         directCommandList->RSSetScissorRects(1, &_scissorRect);
 
         directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
-        // Update the MVP matrix
-        XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
-        mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
-        directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+        // Raster
+        if (!_dxContext->IsRaytracingEnabled())
+        {
+            // Indicate that the back buffer will be used as a render target
+            _TransitionResource(directCommandList, backBuffer,
+                D3D12_RESOURCE_STATE_PRESENT,
+                D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        directCommandList->DrawIndexedInstanced(_countof(_indicies), 1, 0, 0, 0);
+            // Clear the render targets
+            _ClearRTV(directCommandList, rtv, _clearColor);
+            _ClearDepth(directCommandList, dsv);
 
-        // Indicate that the back buffer will now be used to present
-        _TransitionResource(directCommandList, backBuffer,
-            D3D12_RESOURCE_STATE_RENDER_TARGET,
-            D3D12_RESOURCE_STATE_PRESENT);
+            // Update the MVP matrix
+            XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
+            mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
+            directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+
+            directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            directCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
+            directCommandList->IASetIndexBuffer(&_indexBufferView);
+
+            // Draw command
+            directCommandList->DrawIndexedInstanced(_countof(_indicies), 1, 0, 0, 0);
+
+            _TransitionResource(directCommandList, backBuffer,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                D3D12_RESOURCE_STATE_PRESENT);
+        }
+        // Ray tracing
+        else
+        {
+            std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
+            directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+
+            // Transition output buffer from copy to unordered access (
+            CD3DX12_RESOURCE_BARRIER transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            directCommandList->ResourceBarrier(1, &transition);
+
+            // Setup raytracing task
+            D3D12_DISPATCH_RAYS_DESC desc = {};
+            desc.RayGenerationShaderRecord.StartAddress = m_sbtStorage->GetGPUVirtualAddress();
+            desc.RayGenerationShaderRecord.SizeInBytes = m_sbtHelper.GetRayGenSectionSize();
+            
+            // Required to be 64 bit aligned
+            desc.MissShaderTable.StartAddress = ROUND_UP(m_sbtStorage->GetGPUVirtualAddress(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) +
+                ROUND_UP(m_sbtHelper.GetRayGenSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+            desc.MissShaderTable.SizeInBytes = m_sbtHelper.GetMissSectionSize();
+            desc.MissShaderTable.StrideInBytes = m_sbtHelper.GetMissEntrySize();
+
+            // Required to be 64 bit aligned
+            desc.HitGroupTable.StartAddress = m_sbtStorage->GetGPUVirtualAddress() +
+                ROUND_UP(m_sbtHelper.GetRayGenSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT) +
+                ROUND_UP(m_sbtHelper.GetMissSectionSize(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+            desc.HitGroupTable.SizeInBytes = m_sbtHelper.GetHitGroupSectionSize();
+            desc.HitGroupTable.StrideInBytes = m_sbtHelper.GetHitGroupEntrySize();
+           
+            desc.Width = static_cast<UINT>(_viewport.Width);
+            desc.Height = static_cast<UINT>(_viewport.Height);
+            desc.Depth = 1;
+            directCommandList->SetPipelineState1(m_rtStateObject.Get());
+            directCommandList->DispatchRays(&desc);
+
+            // Copy RT output image to render target
+
+            // Transition output from unordered access to copy source
+            transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            directCommandList->ResourceBarrier(1, &transition);
+            
+            // Transition render target from render target to copy dest
+            transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
+            directCommandList->ResourceBarrier(1, &transition);
+            
+            // Copy raytrace output to render target
+            directCommandList->CopyResource(backBuffer.Get(), m_outputResource.Get());
+
+            transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                D3D12_RESOURCE_STATE_PRESENT);
+            directCommandList->ResourceBarrier(1, &transition);
+        }
 
         // Present
          _fenceValues[_dxContext->GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
@@ -257,6 +306,7 @@ namespace DRXDemo
         CreateRaytracingPipeline();
         CreateRaytracingOutputBuffer();
         CreateShaderResourceHeap();
+        CreateShaderBindingTable();
     }
 
     void Game::_ResizeDepthBuffer(int width, int height)
@@ -576,5 +626,25 @@ namespace DRXDemo
         srvDesc.RaytracingAccelerationStructure.Location = m_topLevelASBuffers.pResult->GetGPUVirtualAddress();
 
         _dxContext->Device->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
+    }
+
+    void Game::CreateShaderBindingTable()
+    {
+        m_sbtHelper.Reset();
+
+        D3D12_GPU_DESCRIPTOR_HANDLE srvUavHeapHandle = m_srvUavHeap->GetGPUDescriptorHandleForHeapStart();
+        auto heapPointer = reinterpret_cast<void*>(srvUavHeapHandle.ptr);
+        m_sbtHelper.AddRayGenerationProgram(L"RayGen", { heapPointer });
+        m_sbtHelper.AddMissProgram(L"Miss", {});
+        m_sbtHelper.AddHitGroup(L"HitGroup", {});
+
+        const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
+        m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+        if (!m_sbtStorage)
+        {
+            throw std::logic_error("Could not allocate the shader binding table");
+        }
+
+        m_sbtHelper.Generate(m_sbtStorage.Get(), m_rtStateObjectProps.Get());
     }
 }
