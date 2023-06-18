@@ -544,6 +544,7 @@ namespace DRXDemo
     ComPtr<ID3D12RootSignature> Game::CreateHitSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV);
         return rsc.Generate(_dxContext->Device.Get(), true);
     }
 
@@ -636,7 +637,7 @@ namespace DRXDemo
         auto heapPointer = reinterpret_cast<void*>(srvUavHeapHandle.ptr);
         m_sbtHelper.AddRayGenerationProgram(L"RayGen", { heapPointer });
         m_sbtHelper.AddMissProgram(L"Miss", {});
-        m_sbtHelper.AddHitGroup(L"HitGroup", {});
+        m_sbtHelper.AddHitGroup(L"HitGroup", { (void*)(_vertexBuffer->GetGPUVirtualAddress()) });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
         m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
