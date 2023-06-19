@@ -32,13 +32,21 @@ namespace DRXDemo
         static auto t0 = clock.now();
         static bool rayTracingEnabled = false;
         static bool printedAnything = false;
+        static float rotation[3] = { 0 };
 
         ++frameCounter;
         auto t1 = clock.now();
         auto deltaTime = t1 - t0;
         t0 = t1;
 
-        elapsedSeconds += deltaTime.count() * 1e-9;
+        double secondsSinceLastTick = deltaTime.count() * 1e-9;
+        elapsedSeconds += secondsSinceLastTick;
+
+        const float secondsPerRotation = 10;
+
+        rotation[0] += 2 * XM_PI / secondsPerRotation * secondsSinceLastTick;
+        rotation[1] += 2 * XM_PI / secondsPerRotation * secondsSinceLastTick;
+
         if (elapsedSeconds > 1.0)
         {
             char buffer[500];
@@ -67,7 +75,9 @@ namespace DRXDemo
         }
 
         // Update the model matrix
-        _modelMatrix = XMMatrixIdentity();
+        _modelMatrix = XMMatrixRotationAxis({ 1.f, 0.f, 0.f }, rotation[0]);
+        _modelMatrix *= XMMatrixRotationAxis({ 0.f, 1.f, 0.f }, rotation[1]);
+        _modelMatrix *= XMMatrixRotationAxis({ 0.f, 0.f, 1.f }, rotation[2]);
 
         // Update the view matrix
         const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
@@ -130,6 +140,10 @@ namespace DRXDemo
         // Ray tracing
         else
         {
+            // Update acceleration structures
+            m_instances[0].second = _modelMatrix;
+            CreateTopLevelAS(directCommandList, m_instances, true);
+
             // Update inverse view and projection matrices
             XMMATRIX inverseProjectionMatrix = XMMatrixInverse(nullptr, _projectionMatrix);
             CopyDataToBuffer(_inverseProjectBuffer, &inverseProjectionMatrix, sizeof(inverseProjectionMatrix));
@@ -237,11 +251,11 @@ namespace DRXDemo
         ComPtr<ID3D12Resource> intermediateIndexBuffer;
         _UpdateBufferResource(commandList,
             &_indexBuffer, &intermediateIndexBuffer,
-            _countof(_indicies), sizeof(WORD), _indicies);
+            _countof(_indicies), sizeof(int32_t), _indicies);
 
         // Create index buffer view.
         _indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
-        _indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+        _indexBufferView.Format = DXGI_FORMAT_R32_UINT;
         _indexBufferView.SizeInBytes = sizeof(_indicies);
 
         // Create the descriptor heap for the depth-stencil view.
@@ -469,12 +483,28 @@ namespace DRXDemo
     //
     Game::AccelerationStructureBuffers Game::CreateBottomLevelAS(
         ComPtr<ID3D12GraphicsCommandList4> commandList,
-        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers)
+        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers,
+        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vIndexBuffers)
     {
+
         nv_helpers_dx12::BottomLevelASGenerator bottomLevelAS; // Adding all vertex buffers and not transforming their position.
-        for (const auto &buffer : vVertexBuffers)
+        for (size_t i = 0; i < vVertexBuffers.size(); ++i)
         {
-            bottomLevelAS.AddVertexBuffer(buffer.first.Get(), 0, buffer.second, sizeof(VertexPosColor), 0, 0);
+            if (i < vIndexBuffers.size() && vIndexBuffers[i].second > 0)
+            {
+                bottomLevelAS.AddVertexBuffer(
+                    vVertexBuffers[i].first.Get(), 0,
+                    vVertexBuffers[i].second, sizeof(VertexPosColor),
+                    vIndexBuffers[i].first.Get(), 0,
+                    vIndexBuffers[i].second, nullptr, 0, true);
+            }
+            else
+            {
+                bottomLevelAS.AddVertexBuffer(
+                    vVertexBuffers[i].first.Get(), 0,
+                    vVertexBuffers[i].second, sizeof(VertexPosColor), 0,
+                    0);
+            }    
         }
             
         // The AS build requires some scratch space to store temporary information.
@@ -502,37 +532,47 @@ namespace DRXDemo
 
     void Game::CreateTopLevelAS(
         ComPtr<ID3D12GraphicsCommandList4> commandList,
-        const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances)
+        const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances,
+        bool updateOnly)
     {
-        // Gather all the instances into the builder helper
-        for (size_t i = 0; i < instances.size(); i++)
+        if (!updateOnly)
         {
-            m_topLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(0));
-        }
-        // As for the bottom-level AS, the building the AS requires some scratch space
-        // to store temporary data in addition to the actual AS. In the case of the
-        // top-level AS, the instance descriptors also need to be stored in GPU
-        // memory. This call outputs the memory requirements for each (scratch,
-        // results, instance descriptors) so that the application can allocate the
-        // corresponding memory  
-        UINT64 scratchSize, resultSize, instanceDescsSize;
-        m_topLevelASGenerator.ComputeASBufferSizes(_dxContext->Device.Get(), true, &scratchSize, &resultSize, &instanceDescsSize);
+            // Gather all the instances into the builder helper
+            for (size_t i = 0; i < instances.size(); i++)
+            {
+                m_topLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(0));
+            }
+            // As for the bottom-level AS, the building the AS requires some scratch space
+            // to store temporary data in addition to the actual AS. In the case of the
+            // top-level AS, the instance descriptors also need to be stored in GPU
+            // memory. This call outputs the memory requirements for each (scratch,
+            // results, instance descriptors) so that the application can allocate the
+            // corresponding memory  
+            UINT64 scratchSize, resultSize, instanceDescsSize;
+            m_topLevelASGenerator.ComputeASBufferSizes(_dxContext->Device.Get(), true, &scratchSize, &resultSize, &instanceDescsSize);
 
-        // Create the scratch and result buffers. Since the build is all done on GPU,
-        // those can be allocated on the default heap
-        m_topLevelASBuffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nv_helpers_dx12::kDefaultHeapProps);
-        m_topLevelASBuffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
-        
-        // The buffer describing the instances: ID, shader binding information,
-        // matrices ... Those will be copied into the buffer by the helper through
-        // mapping, so the buffer has to be allocated on the upload heap.
-        m_topLevelASBuffers.pInstanceDesc = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), instanceDescsSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
-        
+            // Create the scratch and result buffers. Since the build is all done on GPU,
+            // those can be allocated on the default heap
+            m_topLevelASBuffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nv_helpers_dx12::kDefaultHeapProps);
+            m_topLevelASBuffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+
+            // The buffer describing the instances: ID, shader binding information,
+            // matrices ... Those will be copied into the buffer by the helper through
+            // mapping, so the buffer has to be allocated on the upload heap.
+            m_topLevelASBuffers.pInstanceDesc = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), instanceDescsSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+        }
+
         // After all the buffers are allocated, or if only an update is required, we
         // can build the acceleration structure. Note that in the case of the update
         // we also pass the existing AS as the 'previous' AS, so that it can be
         // refitted in place.
-        m_topLevelASGenerator.Generate(commandList.Get(), m_topLevelASBuffers.pScratch.Get(), m_topLevelASBuffers.pResult.Get(), m_topLevelASBuffers.pInstanceDesc.Get());
+        m_topLevelASGenerator.Generate(
+            commandList.Get(),
+            m_topLevelASBuffers.pScratch.Get(),
+            m_topLevelASBuffers.pResult.Get(),
+            m_topLevelASBuffers.pInstanceDesc.Get(),
+            updateOnly,
+            m_topLevelASBuffers.pResult.Get());
     }
 
     /// Create all acceleration structures, bottom and top
@@ -542,10 +582,13 @@ namespace DRXDemo
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
 
         // Build the bottom AS from the Triangle vertex buffer
-        AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(directCommandList, { {_vertexBuffer.Get(), static_cast<uint32_t>(_countof(_vertices))}});
+        AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(
+            directCommandList,
+            { {_vertexBuffer.Get(), static_cast<uint32_t>(_countof(_vertices))}},
+            { {_indexBuffer.Get(), static_cast<uint32_t>(_countof(_indicies))}});
         
         // Just one instance for now
-        m_instances = {{bottomLevelBuffers.pResult, XMMatrixIdentity()}}; 
+        m_instances = {{bottomLevelBuffers.pResult, _modelMatrix}}; 
         CreateTopLevelAS(directCommandList, m_instances);
         
         // Flush the command list and wait for it to finish
@@ -586,7 +629,8 @@ namespace DRXDemo
     ComPtr<ID3D12RootSignature> Game::CreateHitSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
-        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV);
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 0); // Vertices
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 1); // Indices
         return rsc.Generate(_dxContext->Device.Get(), true);
     }
 
@@ -687,7 +731,10 @@ namespace DRXDemo
             heapPointer
         });
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
-        m_sbtHelper.AddHitGroup(L"HitGroup", { reinterpret_cast<void*>(_vertexBuffer->GetGPUVirtualAddress()) });
+        m_sbtHelper.AddHitGroup(L"HitGroup", {
+            reinterpret_cast<void*>(_vertexBuffer->GetGPUVirtualAddress()),
+            reinterpret_cast<void*>(_indexBuffer->GetGPUVirtualAddress()),
+        });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
         m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);

@@ -40,7 +40,7 @@ namespace DRXDemo
             //{ { -0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 0.0f, 1.0f } }
         };
 
-        inline const static WORD _indicies[36] =
+        inline const static int32_t _indicies[36] =
         {
             0, 1, 2, 0, 2, 3,
             4, 6, 5, 4, 7, 6,
@@ -108,7 +108,7 @@ namespace DRXDemo
         float _fov = 45.0f;
         float _clearColor[4] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
-        DirectX::XMMATRIX _modelMatrix;
+        DirectX::XMMATRIX _modelMatrix = DirectX::XMMatrixIdentity();
         DirectX::XMMATRIX _viewMatrix;
         DirectX::XMMATRIX _projectionMatrix;
 
@@ -130,14 +130,16 @@ namespace DRXDemo
         /// \return AccelerationStructureBuffers for TLAS
         AccelerationStructureBuffers CreateBottomLevelAS(
             Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
-            std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers);
+            std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vVertexBuffers,
+            std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, uint32_t>> vIndexBuffers = {});
         
         /// Create the main acceleration structure that holds
         /// all instances of the scene
         /// \param instances : pair of BLAS and transform
         void CreateTopLevelAS(
             Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
-            const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances);
+            const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances,
+            bool updateOnly = false);
         
         /// Create all acceleration structures, bottom and top
         void CreateAccelerationStructures();
