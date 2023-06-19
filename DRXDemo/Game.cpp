@@ -30,6 +30,8 @@ namespace DRXDemo
         static double elapsedSeconds = 0.0;
         static std::chrono::high_resolution_clock clock;
         static auto t0 = clock.now();
+        static bool rayTracingEnabled = false;
+        static bool printedAnything = false;
 
         ++frameCounter;
         auto t1 = clock.now();
@@ -46,6 +48,22 @@ namespace DRXDemo
 
             frameCounter = 0;
             elapsedSeconds = 0.0;
+        }
+
+        // Print whether we are raytracing
+        if (!printedAnything || _dxContext->IsRaytracingEnabled() != rayTracingEnabled)
+        {
+            if (_dxContext->IsRaytracingEnabled())
+            {
+                OutputDebugStringA("Raytracing Enabled\n");
+            }
+            else
+            {
+                OutputDebugStringA("Rasterization Enabled\n");
+            }
+
+            printedAnything = true;
+            rayTracingEnabled = _dxContext->IsRaytracingEnabled();
         }
 
         // Update the model matrix
@@ -81,6 +99,10 @@ namespace DRXDemo
         // Raster
         if (!_dxContext->IsRaytracingEnabled())
         {
+            // Update the MVP matrix
+            XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
+            mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
+
             // Indicate that the back buffer will be used as a render target
             _TransitionResource(directCommandList, backBuffer,
                 D3D12_RESOURCE_STATE_PRESENT,
@@ -90,10 +112,9 @@ namespace DRXDemo
             _ClearRTV(directCommandList, rtv, _clearColor);
             _ClearDepth(directCommandList, dsv);
 
-            // Update the MVP matrix
-            XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
-            mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
-            directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+            //directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+            CopyDataToBuffer(_mvpBuffer, &mvpMatrix, sizeof(mvpMatrix));
+            directCommandList->SetGraphicsRootConstantBufferView(0, _mvpBuffer->GetGPUVirtualAddress());
 
             directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             directCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
@@ -109,6 +130,14 @@ namespace DRXDemo
         // Ray tracing
         else
         {
+            // Update inverse view and projection matrices
+            XMMATRIX inverseProjectionMatrix = XMMatrixInverse(nullptr, _projectionMatrix);
+            CopyDataToBuffer(_inverseProjectBuffer, &inverseProjectionMatrix, sizeof(inverseProjectionMatrix));
+
+            XMMATRIX inverseViewMatrix = XMMatrixInverse(nullptr, _viewMatrix);
+            CopyDataToBuffer(_inverseViewBuffer, &inverseViewMatrix, sizeof(inverseViewMatrix));
+
+            // Set descriptor heap
             std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
             directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
 
@@ -138,7 +167,6 @@ namespace DRXDemo
             desc.Height = static_cast<UINT>(_viewport.Height);
             desc.Depth = 1;
             directCommandList->SetPipelineState1(m_rtStateObject.Get());
-            directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(_clearColor) / 4, _clearColor, 0);
             directCommandList->DispatchRays(&desc);
 
             // Copy RT output image to render target
@@ -255,7 +283,7 @@ namespace DRXDemo
 
         // A single 32-bit constant root parameter that is used by the vertex shader.
         CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-        rootParameters[0].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+        rootParameters[0].InitAsConstantBufferView(0);
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
         rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
@@ -303,7 +331,14 @@ namespace DRXDemo
         // Resize/Create the depth buffer.
         _ResizeDepthBuffer(static_cast<int>(_viewport.Width), static_cast<int>(_viewport.Height));
 
-        CreateGlobalConstantBuffer();
+        // Create CBVs
+        Game::CreateBuffer(sizeof(_clearColor), &_clearColorBuffer);
+        CopyDataToBuffer(_clearColorBuffer, _clearColor, sizeof(_clearColor));
+
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_mvpBuffer);
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseProjectBuffer);
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseViewBuffer);
+
         CreateAccelerationStructures();
         CreateRaytracingPipeline();
         CreateRaytracingOutputBuffer();
@@ -525,6 +560,11 @@ namespace DRXDemo
     ComPtr<ID3D12RootSignature> Game::CreateRayGenSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
+        // Inverse projection CBV
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 0);
+        // Inverse view CBV
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 1);
+        // Heap
         rsc.AddHeapRangesParameter({
             {
                 0 /*u0*/,
@@ -553,6 +593,7 @@ namespace DRXDemo
     ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
+        // Clear Color
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV);
         return rsc.Generate(_dxContext->Device.Get(), true);
     }
@@ -617,12 +658,14 @@ namespace DRXDemo
 
         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_srvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
+        // Unordered access view (Output image)
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
         _dxContext->Device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &uavDesc, srvHandle);
 
         srvHandle.ptr += _dxContext->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+        // Shared resource view (Acceleration structure)
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
@@ -638,8 +681,12 @@ namespace DRXDemo
 
         D3D12_GPU_DESCRIPTOR_HANDLE srvUavHeapHandle = m_srvUavHeap->GetGPUDescriptorHandleForHeapStart();
         auto heapPointer = reinterpret_cast<void*>(srvUavHeapHandle.ptr);
-        m_sbtHelper.AddRayGenerationProgram(L"RayGen", { heapPointer });
-        m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(m_globalConstantBuffer->GetGPUVirtualAddress()) });
+        m_sbtHelper.AddRayGenerationProgram(L"RayGen", {
+            reinterpret_cast<void*>(_inverseProjectBuffer->GetGPUVirtualAddress()),
+            reinterpret_cast<void*>(_inverseViewBuffer->GetGPUVirtualAddress()),
+            heapPointer
+        });
+        m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
         m_sbtHelper.AddHitGroup(L"HitGroup", { reinterpret_cast<void*>(_vertexBuffer->GetGPUVirtualAddress()) });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
@@ -652,20 +699,22 @@ namespace DRXDemo
         m_sbtHelper.Generate(m_sbtStorage.Get(), m_rtStateObjectProps.Get());
     }
 
-    void Game::CreateGlobalConstantBuffer()
+    void Game::CreateBuffer(size_t bufferSize, ID3D12Resource** buffer)
     {        
-        // Create our buffer
-        m_globalConstantBuffer = nv_helpers_dx12::CreateBuffer(
+        *buffer = nv_helpers_dx12::CreateBuffer(
             _dxContext->Device.Get(),
-            sizeof(_clearColor),
+            bufferSize,
             D3D12_RESOURCE_FLAG_NONE,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nv_helpers_dx12::kUploadHeapProps);
-        
+    }
+
+    void Game::CopyDataToBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> buffer, void* data, size_t bufferSize)
+    {
         // Copy CPU memory to GPU
         uint8_t* pData;
-        ThrowIfFailed(m_globalConstantBuffer->Map(0, nullptr, (void**)&pData));
-        memcpy(pData, _clearColor, sizeof(_clearColor));
-        m_globalConstantBuffer->Unmap(0, nullptr);
+        ThrowIfFailed(buffer->Map(0, nullptr, (void**)&pData));
+        memcpy(pData, data, bufferSize);
+        buffer->Unmap(0, nullptr);
     }
 }

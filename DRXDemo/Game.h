@@ -26,29 +26,29 @@ namespace DRXDemo
         };
 
         inline const static VertexPosColor _vertices[8] = {
-            //{ DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-            //{ DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-            //{ DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-            //{ DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-            //{ DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-            //{ DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-            //{ DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-            //{ DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
+            { DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
+            { DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
+            { DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
+            { DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
+            { DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
+            { DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
+            { DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
+            { DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
 
-            { { 0.0f, 0.25f, 0.0f }, DirectX::XMFLOAT3{ 1.0f, 0.0f, 0.0f } },
-            { { 0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f } },
-            { { -0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 0.0f, 1.0f } }
+            //{ { 0.0f, 0.25f, 0.0f }, DirectX::XMFLOAT3{ 1.0f, 0.0f, 0.0f } },
+            //{ { 0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f } },
+            //{ { -0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 0.0f, 1.0f } }
         };
 
         inline const static WORD _indicies[36] =
         {
-            //0, 1, 2, 0, 2, 3,
-            //4, 6, 5, 4, 7, 6,
-            //4, 5, 1, 4, 1, 0,
-            //3, 2, 6, 3, 6, 7,
-            //1, 5, 6, 1, 6, 2,
-            //4, 0, 3, 4, 3, 7
-            0,1,2
+            0, 1, 2, 0, 2, 3,
+            4, 6, 5, 4, 7, 6,
+            4, 5, 1, 4, 1, 0,
+            3, 2, 6, 3, 6, 7,
+            1, 5, 6, 1, 6, 2,
+            4, 0, 3, 4, 3, 7
+            /*0,1,2*/
         };
 
         Window* _window;
@@ -170,7 +170,11 @@ namespace DRXDemo
         nv_helpers_dx12::ShaderBindingTableGenerator m_sbtHelper;
         Microsoft::WRL::ComPtr<ID3D12Resource> m_sbtStorage;
 
-        void CreateGlobalConstantBuffer();
-        Microsoft::WRL::ComPtr<ID3D12Resource> m_globalConstantBuffer;
+        void CreateBuffer(size_t bufferSize, ID3D12Resource** buffer);
+        void CopyDataToBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> buffer, void* data, size_t bufferSize);
+        Microsoft::WRL::ComPtr<ID3D12Resource> _clearColorBuffer;
+        Microsoft::WRL::ComPtr<ID3D12Resource> _mvpBuffer;
+        Microsoft::WRL::ComPtr<ID3D12Resource> _inverseProjectBuffer;
+        Microsoft::WRL::ComPtr<ID3D12Resource> _inverseViewBuffer;
     };
 }
