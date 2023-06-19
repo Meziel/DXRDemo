@@ -12,7 +12,7 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{bf2847e0-0a38-49e6-8bd7-a1b582cf2e0e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\DRXUtils">
+    <Filter Include="Source Files\DXRUtils">
       <UniqueIdentifier>{f70c9d6b-5491-44fa-a8f4-c194c002db4c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -41,23 +41,23 @@
     <ClInclude Include="CommandQueue.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\BottomLevelASGenerator.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\BottomLevelASGenerator.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\DXRHelper.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\DXRHelper.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\RaytracingPipelineGenerator.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\RaytracingPipelineGenerator.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\RootSignatureGenerator.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\RootSignatureGenerator.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\ShaderBindingTableGenerator.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\ShaderBindingTableGenerator.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DRXUtils\TopLevelASGenerator.h">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClInclude Include="DXRUtils\TopLevelASGenerator.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -73,27 +73,27 @@
     <ClCompile Include="CommandQueue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DRXUtils\BottomLevelASGenerator.cpp">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClCompile Include="DXRUtils\BottomLevelASGenerator.cpp">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClCompile>
-    <ClCompile Include="DRXUtils\RaytracingPipelineGenerator.cpp">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClCompile Include="DXRUtils\RaytracingPipelineGenerator.cpp">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClCompile>
-    <ClCompile Include="DRXUtils\RootSignatureGenerator.cpp">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClCompile Include="DXRUtils\RootSignatureGenerator.cpp">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClCompile>
-    <ClCompile Include="DRXUtils\ShaderBindingTableGenerator.cpp">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClCompile Include="DXRUtils\ShaderBindingTableGenerator.cpp">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClCompile>
-    <ClCompile Include="DRXUtils\TopLevelASGenerator.cpp">
-      <Filter>Source Files\DRXUtils</Filter>
+    <ClCompile Include="DXRUtils\TopLevelASGenerator.cpp">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClCompile>
     <ClCompile Include="Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="DRXDemo.rc">
+    <ResourceCompile Include="DXRDemo.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -101,7 +101,7 @@
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="DRXDemo.ico">
+    <Image Include="DXRDemo.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

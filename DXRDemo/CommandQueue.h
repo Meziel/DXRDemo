@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <queue>
 
-namespace DRXDemo
+namespace DXRDemo
 {
     class CommandQueue final
     {

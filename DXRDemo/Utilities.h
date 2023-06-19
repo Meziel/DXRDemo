@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <stdexcept>
 
-namespace DRXDemo
+namespace DXRDemo
 {
     inline void ThrowIfFailed(HRESULT hr)
     {

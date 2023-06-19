@@ -12,7 +12,7 @@
 #include <vector>
 #include "../Utilities.h"
 
-namespace DRXDemo
+namespace DXRDemo
 {
 
     inline ID3D12Resource* CreateBuffer(ID3D12Device* m_device, uint64_t size,

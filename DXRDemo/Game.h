@@ -1,11 +1,11 @@
 #pragma once
 
 #include "DXContext.h"
-#include "DRXUtils/TopLevelASGenerator.h"
-#include "DRXUtils/ShaderBindingTableGenerator.h"
+#include "DXRUtils/TopLevelASGenerator.h"
+#include "DXRUtils/ShaderBindingTableGenerator.h"
 #include "dxcapi.h"
 
-namespace DRXDemo
+namespace DXRDemo
 {
     class Game final
     {

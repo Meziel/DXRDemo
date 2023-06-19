@@ -5,15 +5,15 @@
 #include <d3dcompiler.h>
 
 #include "DXRHelper.h"
-#include "DRXUtils/BottomLevelASGenerator.h"
-#include "DRXUtils/RaytracingPipelineGenerator.h"
-#include "DRXUtils/RootSignatureGenerator.h"
+#include "DXRUtils/BottomLevelASGenerator.h"
+#include "DXRUtils/RaytracingPipelineGenerator.h"
+#include "DXRUtils/RootSignatureGenerator.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
 using namespace nv_helpers_dx12;
 
-namespace DRXDemo
+namespace DXRDemo
 {
     Game::Game(Window& window, DXContext& dxContext, uint32_t width, uint32_t height) :
         _window(&window),

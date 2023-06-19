@@ -8,7 +8,7 @@
 #include "framework.h"
 #include "Resource.h"
 
-namespace DRXDemo
+namespace DXRDemo
 {
     class Window
     {

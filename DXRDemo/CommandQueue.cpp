@@ -4,7 +4,7 @@
 
 using namespace Microsoft::WRL;
 
-namespace DRXDemo
+namespace DXRDemo
 {
     CommandQueue::CommandQueue(Microsoft::WRL::ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type) :
         _device(device),

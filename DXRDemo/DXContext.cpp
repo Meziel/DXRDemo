@@ -5,7 +5,7 @@
 using namespace Microsoft::WRL;
 using namespace DirectX;
 
-namespace DRXDemo
+namespace DXRDemo
 {
     DXContext::DXContext(const Window& window, uint32_t numBuffers) :
         _numBuffers(numBuffers)

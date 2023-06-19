@@ -22,9 +22,9 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{46cf5c7c-7bb3-4982-ba41-aaf31b97b9ec}</ProjectGuid>
-    <RootNamespace>DRXDemo</RootNamespace>
+    <RootNamespace>DXRDemo</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>DRXDemo</ProjectName>
+    <ProjectName>DXRDemo</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -137,12 +137,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CommandQueue.h" />
-    <ClInclude Include="DRXUtils\BottomLevelASGenerator.h" />
-    <ClInclude Include="DRXUtils\DXRHelper.h" />
-    <ClInclude Include="DRXUtils\RaytracingPipelineGenerator.h" />
-    <ClInclude Include="DRXUtils\RootSignatureGenerator.h" />
-    <ClInclude Include="DRXUtils\ShaderBindingTableGenerator.h" />
-    <ClInclude Include="DRXUtils\TopLevelASGenerator.h" />
+    <ClInclude Include="DXRUtils\BottomLevelASGenerator.h" />
+    <ClInclude Include="DXRUtils\DXRHelper.h" />
+    <ClInclude Include="DXRUtils\RaytracingPipelineGenerator.h" />
+    <ClInclude Include="DXRUtils\RootSignatureGenerator.h" />
+    <ClInclude Include="DXRUtils\ShaderBindingTableGenerator.h" />
+    <ClInclude Include="DXRUtils\TopLevelASGenerator.h" />
     <ClInclude Include="DXContext.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Game.h" />
@@ -153,21 +153,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CommandQueue.cpp" />
-    <ClCompile Include="DRXUtils\BottomLevelASGenerator.cpp" />
-    <ClCompile Include="DRXUtils\RaytracingPipelineGenerator.cpp" />
-    <ClCompile Include="DRXUtils\RootSignatureGenerator.cpp" />
-    <ClCompile Include="DRXUtils\ShaderBindingTableGenerator.cpp" />
-    <ClCompile Include="DRXUtils\TopLevelASGenerator.cpp" />
+    <ClCompile Include="DXRUtils\BottomLevelASGenerator.cpp" />
+    <ClCompile Include="DXRUtils\RaytracingPipelineGenerator.cpp" />
+    <ClCompile Include="DXRUtils\RootSignatureGenerator.cpp" />
+    <ClCompile Include="DXRUtils\ShaderBindingTableGenerator.cpp" />
+    <ClCompile Include="DXRUtils\TopLevelASGenerator.cpp" />
     <ClCompile Include="DXContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="DRXDemo.rc" />
+    <ResourceCompile Include="DXRDemo.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="DRXDemo.ico" />
+    <Image Include="DXRDemo.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>

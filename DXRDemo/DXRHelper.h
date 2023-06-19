@@ -37,7 +37,7 @@ namespace nv_helpers_dx12
         bufDesc.Width = size;
 
         ID3D12Resource* pBuffer;
-        DRXDemo::ThrowIfFailed(m_device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufDesc,
+        DXRDemo::ThrowIfFailed(m_device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufDesc,
             initState, nullptr, IID_PPV_ARGS(&pBuffer)));
         return pBuffer;
     }
@@ -70,9 +70,9 @@ namespace nv_helpers_dx12
         // Initialize the DXC compiler and compiler helper
         if (!pCompiler)
         {
-            DRXDemo::ThrowIfFailed(DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler), (void**)&pCompiler));
-            DRXDemo::ThrowIfFailed(DxcCreateInstance(CLSID_DxcLibrary, __uuidof(IDxcLibrary), (void**)&pLibrary));
-            DRXDemo::ThrowIfFailed(pLibrary->CreateIncludeHandler(&dxcIncludeHandler));
+            DXRDemo::ThrowIfFailed(DxcCreateInstance(CLSID_DxcCompiler, __uuidof(IDxcCompiler), (void**)&pCompiler));
+            DXRDemo::ThrowIfFailed(DxcCreateInstance(CLSID_DxcLibrary, __uuidof(IDxcLibrary), (void**)&pLibrary));
+            DXRDemo::ThrowIfFailed(pLibrary->CreateIncludeHandler(&dxcIncludeHandler));
         }
         // Open and read the file
         std::ifstream shaderFile(fileName);
@@ -86,17 +86,17 @@ namespace nv_helpers_dx12
 
         // Create blob from the string
         IDxcBlobEncoding* pTextBlob;
-        DRXDemo::ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned(
+        DXRDemo::ThrowIfFailed(pLibrary->CreateBlobWithEncodingFromPinned(
             (LPBYTE)sShader.c_str(), (uint32_t)sShader.size(), 0, &pTextBlob));
 
         // Compile
         IDxcOperationResult* pResult;
-        DRXDemo::ThrowIfFailed(pCompiler->Compile(pTextBlob, fileName, L"", L"lib_6_3", nullptr, 0, nullptr, 0,
+        DXRDemo::ThrowIfFailed(pCompiler->Compile(pTextBlob, fileName, L"", L"lib_6_3", nullptr, 0, nullptr, 0,
             dxcIncludeHandler, &pResult));
 
         // Verify the result
         HRESULT resultCode;
-        DRXDemo::ThrowIfFailed(pResult->GetStatus(&resultCode));
+        DXRDemo::ThrowIfFailed(pResult->GetStatus(&resultCode));
         if (FAILED(resultCode))
         {
             IDxcBlobEncoding* pError;
@@ -119,7 +119,7 @@ namespace nv_helpers_dx12
         }
 
         IDxcBlob* pBlob;
-        DRXDemo::ThrowIfFailed(pResult->GetResult(&pBlob));
+        DXRDemo::ThrowIfFailed(pResult->GetResult(&pBlob));
         return pBlob;
     }
 
@@ -136,7 +136,7 @@ namespace nv_helpers_dx12
             shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
         ID3D12DescriptorHeap* pHeap;
-        DRXDemo::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&pHeap)));
+        DXRDemo::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&pHeap)));
         return pHeap;
     }
 

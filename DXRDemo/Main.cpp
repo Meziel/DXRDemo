@@ -9,7 +9,7 @@
 #include "Game.h"
 #include "DXContext.h"
 
-using namespace DRXDemo;
+using namespace DXRDemo;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -22,10 +22,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    const uint32_t width = 1280;
-    const uint32_t height = 720;
+    const uint32_t width = 800;
+    const uint32_t height = 600;
 
-    Window window(hInstance, L"DRX Demo", width, height);
+    Window window(hInstance, L"DXR Demo", width, height);
     DXContext dxContext(window, 3);
 
     if (!dxContext.IsRaytracingSupported())

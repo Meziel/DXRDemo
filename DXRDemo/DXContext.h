@@ -14,7 +14,7 @@
 #include "Window.h"
 #include "CommandQueue.h"
 
-namespace DRXDemo
+namespace DXRDemo
 {
     class DXContext
     {
