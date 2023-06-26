@@ -16,7 +16,7 @@
 
 namespace DXRDemo
 {
-    class DXContext
+    class DXContext final
     {
     public:
         DXContext(const Window& window, uint32_t numBuffers);
@@ -44,8 +44,9 @@ namespace DXRDemo
         D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetView() const;
         UINT Present();
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(
-            Microsoft::WRL::ComPtr<ID3D12Device2> device,
-            D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors);
+            D3D12_DESCRIPTOR_HEAP_TYPE type,
+            uint32_t numDescriptors,
+            bool shaderVisible);
         UINT GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
 
         bool IsRaytracingSupported();

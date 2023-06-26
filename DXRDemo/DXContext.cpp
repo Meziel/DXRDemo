@@ -34,7 +34,7 @@ namespace DXRDemo
         _currentBackBufferIndex = _swapChain->GetCurrentBackBufferIndex();
         
         // Create RTV descriptor heap
-        _rtvDescriptorHeap = CreateDescriptorHeap(Device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numBuffers);
+        _rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, numBuffers, false);
         _rtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
         // Create render target views
@@ -108,17 +108,18 @@ namespace DXRDemo
     }
 
     ComPtr<ID3D12DescriptorHeap> DXContext::CreateDescriptorHeap(
-        ComPtr<ID3D12Device2> device,
         D3D12_DESCRIPTOR_HEAP_TYPE type,
-        uint32_t numDescriptors)
+        uint32_t numDescriptors,
+        bool shaderVisible)
     {
         ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
         desc.NumDescriptors = numDescriptors;
         desc.Type = type;
+        desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-        ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
+        ThrowIfFailed(Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptorHeap)));
 
         return descriptorHeap;
     }

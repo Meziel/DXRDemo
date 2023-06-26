@@ -15,12 +15,17 @@ using namespace nv_helpers_dx12;
 
 namespace DXRDemo
 {
-    Game::Game(Window& window, DXContext& dxContext, uint32_t width, uint32_t height) :
+    Game::Game(Window& window, uint32_t width, uint32_t height) :
         _window(&window),
-        _dxContext(&dxContext),
+        _dxContext(window, 3),
         _viewport(CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)))
     {
-        _fenceValues.resize(dxContext.GetNumberBuffers());
+        if (!_dxContext.IsRaytracingSupported())
+        {
+            assert("Raytracing not supported on device");
+        }
+
+        _fenceValues.resize(_dxContext.GetNumberBuffers());
         _OnInit();
     }
 
@@ -59,9 +64,9 @@ namespace DXRDemo
         }
 
         // Print whether we are raytracing
-        if (!printedAnything || _dxContext->IsRaytracingEnabled() != rayTracingEnabled)
+        if (!printedAnything || _dxContext.IsRaytracingEnabled() != rayTracingEnabled)
         {
-            if (_dxContext->IsRaytracingEnabled())
+            if (_dxContext.IsRaytracingEnabled())
             {
                 OutputDebugStringA("Raytracing Enabled\n");
             }
@@ -71,7 +76,7 @@ namespace DXRDemo
             }
 
             printedAnything = true;
-            rayTracingEnabled = _dxContext->IsRaytracingEnabled();
+            rayTracingEnabled = _dxContext.IsRaytracingEnabled();
         }
 
         // Update the model matrix
@@ -92,12 +97,12 @@ namespace DXRDemo
 
     void Game::Render()
     {
-        CommandQueue& directCommandQueue = *_dxContext->DirectCommandQueue;
+        CommandQueue& directCommandQueue = *_dxContext.DirectCommandQueue;
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
         
-        UINT currentBackBufferIndex = _dxContext->GetCurrentBackBufferIndex();
-        auto backBuffer = _dxContext->GetCurrentBackBuffer();
-        auto rtv = _dxContext->GetCurrentRenderTargetView();
+        UINT currentBackBufferIndex = _dxContext.GetCurrentBackBufferIndex();
+        auto backBuffer = _dxContext.GetCurrentBackBuffer();
+        auto rtv = _dxContext.GetCurrentRenderTargetView();
         auto dsv = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
 
         directCommandList->SetGraphicsRootSignature(_rootSignature.Get());
@@ -107,7 +112,7 @@ namespace DXRDemo
         directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
         // Raster
-        if (!_dxContext->IsRaytracingEnabled())
+        if (!_dxContext.IsRaytracingEnabled())
         {
             // Update the MVP matrix
             XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
@@ -203,9 +208,9 @@ namespace DXRDemo
         }
 
         // Present
-         _fenceValues[_dxContext->GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
-         _dxContext->Present();
-         directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext->GetCurrentBackBufferIndex()]);
+         _fenceValues[_dxContext.GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
+         _dxContext.Present();
+         directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext.GetCurrentBackBufferIndex()]);
     }
 
     void Game::OnKeyUp(uint8_t key)
@@ -217,10 +222,10 @@ namespace DXRDemo
         switch (key)
         {
             case 'V':
-                _dxContext->SetVSync(!_dxContext->IsVSyncEnabled());
+                _dxContext.SetVSync(!_dxContext.IsVSyncEnabled());
                 break;
             case VK_SPACE:
-                _dxContext->SetRaytracing(!_dxContext->IsRaytracingEnabled());
+                _dxContext.SetRaytracing(!_dxContext.IsRaytracingEnabled());
                 break;
             case VK_ESCAPE:
                 _window->Quit();
@@ -232,8 +237,8 @@ namespace DXRDemo
 
     void Game::_OnInit()
     {
-        auto device = _dxContext->Device;
-        CommandQueue& copyCommandQueue = *_dxContext->CopyCommandQueue;
+        auto device = _dxContext.Device;
+        CommandQueue& copyCommandQueue = *_dxContext.CopyCommandQueue;
         auto commandList = copyCommandQueue.GetCommandList();
 
         // Upload vertex buffer data.
@@ -259,11 +264,7 @@ namespace DXRDemo
         _indexBufferView.SizeInBytes = sizeof(_indicies);
 
         // Create the descriptor heap for the depth-stencil view.
-        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-        dsvHeapDesc.NumDescriptors = 1;
-        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-        dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        ThrowIfFailed(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&_dsvHeap)));
+        _dsvHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
         // Load the vertex shader.
         ComPtr<ID3DBlob> vertexShaderBlob;
@@ -363,12 +364,12 @@ namespace DXRDemo
     void Game::_ResizeDepthBuffer(int width, int height)
     {
         // Flush any GPU commands that might be referencing the depth buffer.
-        _dxContext->Flush();
+        _dxContext.Flush();
 
         width = std::max(1, width);
         height = std::max(1, height);
 
-        auto device = _dxContext->Device;
+        auto device = _dxContext.Device;
 
         // Resize screen dependent resources.
         // Create a depth buffer.
@@ -435,7 +436,7 @@ namespace DXRDemo
         size_t numElements, size_t elementSize, const void* bufferData,
         D3D12_RESOURCE_FLAGS flags)
     {
-        auto device = _dxContext->Device;
+        auto device = _dxContext.Device;
 
         size_t bufferSize = numElements * elementSize;
 
@@ -514,14 +515,14 @@ namespace DXRDemo
         // The final AS also needs to be stored in addition to the existing vertex
         // buffers. It size is also dependent on the scene complexity.
         UINT64 resultSizeInBytes = 0;
-        bottomLevelAS.ComputeASBufferSizes(_dxContext->Device.Get(), false, &scratchSizeInBytes, &resultSizeInBytes);
+        bottomLevelAS.ComputeASBufferSizes(_dxContext.Device.Get(), false, &scratchSizeInBytes, &resultSizeInBytes);
             
         // Once the sizes are obtained, the application is responsible for allocating
         // the necessary buffers. Since the entire generation will be done on the GPU,
         // we can directly allocate those on the default heap
         AccelerationStructureBuffers buffers;
-        buffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, nv_helpers_dx12::kDefaultHeapProps);
-        buffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+        buffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), scratchSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, nv_helpers_dx12::kDefaultHeapProps);
+        buffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), resultSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
             
         // Build the acceleration structure. Note that this call integrates a barrier
         // on the generated AS, so that it can be used to compute a top-level AS right
@@ -549,17 +550,17 @@ namespace DXRDemo
             // results, instance descriptors) so that the application can allocate the
             // corresponding memory  
             UINT64 scratchSize, resultSize, instanceDescsSize;
-            m_topLevelASGenerator.ComputeASBufferSizes(_dxContext->Device.Get(), true, &scratchSize, &resultSize, &instanceDescsSize);
+            m_topLevelASGenerator.ComputeASBufferSizes(_dxContext.Device.Get(), true, &scratchSize, &resultSize, &instanceDescsSize);
 
             // Create the scratch and result buffers. Since the build is all done on GPU,
             // those can be allocated on the default heap
-            m_topLevelASBuffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), scratchSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nv_helpers_dx12::kDefaultHeapProps);
-            m_topLevelASBuffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), resultSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+            m_topLevelASBuffers.pScratch = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), scratchSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nv_helpers_dx12::kDefaultHeapProps);
+            m_topLevelASBuffers.pResult = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), resultSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
 
             // The buffer describing the instances: ID, shader binding information,
             // matrices ... Those will be copied into the buffer by the helper through
             // mapping, so the buffer has to be allocated on the upload heap.
-            m_topLevelASBuffers.pInstanceDesc = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), instanceDescsSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+            m_topLevelASBuffers.pInstanceDesc = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), instanceDescsSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
         }
 
         // After all the buffers are allocated, or if only an update is required, we
@@ -578,7 +579,7 @@ namespace DXRDemo
     /// Create all acceleration structures, bottom and top
     void Game::CreateAccelerationStructures()
     {
-        CommandQueue& directCommandQueue = *_dxContext->DirectCommandQueue;
+        CommandQueue& directCommandQueue = *_dxContext.DirectCommandQueue;
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
 
         // Build the bottom AS from the Triangle vertex buffer
@@ -623,7 +624,7 @@ namespace DXRDemo
                 D3D12_DESCRIPTOR_RANGE_TYPE_SRV /*Top-level acceleration structure*/,
                 1} 
             });
-        return rsc.Generate(_dxContext->Device.Get(), true);
+        return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
     ComPtr<ID3D12RootSignature> Game::CreateHitSignature()
@@ -631,7 +632,7 @@ namespace DXRDemo
         nv_helpers_dx12::RootSignatureGenerator rsc;
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 0); // Vertices
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 1); // Indices
-        return rsc.Generate(_dxContext->Device.Get(), true);
+        return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
     ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
@@ -639,7 +640,7 @@ namespace DXRDemo
         nv_helpers_dx12::RootSignatureGenerator rsc;
         // Clear Color
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV);
-        return rsc.Generate(_dxContext->Device.Get(), true);
+        return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
     void Game::CreateRaytracingPipeline()
@@ -654,7 +655,7 @@ namespace DXRDemo
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Miss.cso", &m_missLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Hit.cso", &m_hitLibrary));
 
-        nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext->Device.Get());
+        nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext.Device.Get());
 
         pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
         pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
@@ -691,23 +692,23 @@ namespace DXRDemo
         resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resDesc.MipLevels = 1;
         resDesc.SampleDesc.Count = 1;
-        ThrowIfFailed(_dxContext->Device->CreateCommittedResource(
+        ThrowIfFailed(_dxContext.Device->CreateCommittedResource(
             &nv_helpers_dx12::kDefaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc,
             D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_outputResource)));
     }
 
     void Game::CreateShaderResourceHeap()
     {
-        m_srvUavHeap = nv_helpers_dx12::CreateDescriptorHeap(_dxContext->Device.Get(), 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+        m_srvUavHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2, true);
 
         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_srvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
         // Unordered access view (Output image)
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        _dxContext->Device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &uavDesc, srvHandle);
+        _dxContext.Device->CreateUnorderedAccessView(m_outputResource.Get(), nullptr, &uavDesc, srvHandle);
 
-        srvHandle.ptr += _dxContext->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        srvHandle.ptr += _dxContext.Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         // Shared resource view (Acceleration structure)
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
@@ -716,7 +717,7 @@ namespace DXRDemo
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.RaytracingAccelerationStructure.Location = m_topLevelASBuffers.pResult->GetGPUVirtualAddress();
 
-        _dxContext->Device->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
+        _dxContext.Device->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
     }
 
     void Game::CreateShaderBindingTable()
@@ -737,7 +738,7 @@ namespace DXRDemo
         });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
-        m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext->Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
+        m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);
         if (!m_sbtStorage)
         {
             throw std::logic_error("Could not allocate the shader binding table");
@@ -749,7 +750,7 @@ namespace DXRDemo
     void Game::CreateBuffer(size_t bufferSize, ID3D12Resource** buffer)
     {        
         *buffer = nv_helpers_dx12::CreateBuffer(
-            _dxContext->Device.Get(),
+            _dxContext.Device.Get(),
             bufferSize,
             D3D12_RESOURCE_FLAG_NONE,
             D3D12_RESOURCE_STATE_GENERIC_READ,

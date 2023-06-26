@@ -7,6 +7,7 @@
 
 #include "Window.h"
 #include "Game.h"
+#include "AssetImporter.h"
 #include "DXContext.h"
 
 using namespace DXRDemo;
@@ -26,17 +27,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     const uint32_t height = 600;
 
     Window window(hInstance, L"DXR Demo", width, height);
-    DXContext dxContext(window, 3);
 
-    if (!dxContext.IsRaytracingSupported())
-    {
-        assert("Raytracing not supported on device");
-        return EXIT_FAILURE;
-    }
+    AssetImporter assetImporter;
 
-    Game game(window, dxContext, width, height);
+    Game game(window, width, height);
 
-    // TODO: move to game
     Window::OnPaintCallback onPaintCallback = [&game]() {
         game.Update();
         game.Render();

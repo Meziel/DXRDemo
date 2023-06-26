@@ -137,6 +137,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CommandQueue.h" />
+    <ClInclude Include="Component.h" />
     <ClInclude Include="DXRUtils\BottomLevelASGenerator.h" />
     <ClInclude Include="DXRUtils\DXRHelper.h" />
     <ClInclude Include="DXRUtils\RaytracingPipelineGenerator.h" />
@@ -146,8 +147,15 @@
     <ClInclude Include="DXContext.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="MeshMaterial.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="Scene.h" />
+    <ClInclude Include="AssetImporter.h" />
+    <ClInclude Include="GameObject.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="Utilities.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
@@ -161,6 +169,8 @@
     <ClCompile Include="DXContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="AssetImporter.cpp" />
+    <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>

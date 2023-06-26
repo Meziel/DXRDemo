@@ -1,5 +1,6 @@
 #pragma once
 
+#include <directxmath.h>
 #include "DXContext.h"
 #include "DXRUtils/TopLevelASGenerator.h"
 #include "DXRUtils/ShaderBindingTableGenerator.h"
@@ -10,7 +11,7 @@ namespace DXRDemo
     class Game final
     {
     public:
-        Game(Window& window, DXContext& dxContext, uint32_t width, uint32_t height);
+        Game(Window& window, uint32_t width, uint32_t height);
 
         void Update();
         void Render();
@@ -52,7 +53,7 @@ namespace DXRDemo
         };
 
         Window* _window;
-        DXContext* _dxContext;
+        DXContext _dxContext;
         std::vector<uint64_t> _fenceValues;
 
         void _OnInit();
