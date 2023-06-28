@@ -7,7 +7,6 @@
 
 #include "Window.h"
 #include "Game.h"
-#include "AssetImporter.h"
 #include "DXContext.h"
 
 using namespace DXRDemo;
@@ -27,8 +26,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     const uint32_t height = 600;
 
     Window window(hInstance, L"DXR Demo", width, height);
-
-    AssetImporter assetImporter;
 
     Game game(window, width, height);
 

@@ -3,12 +3,16 @@
 #include <wrl.h>
 #include <chrono>
 #include <d3dcompiler.h>
+#include <memory>
 
 #include "DXRHelper.h"
 #include "DXRUtils/BottomLevelASGenerator.h"
 #include "DXRUtils/RaytracingPipelineGenerator.h"
 #include "DXRUtils/RootSignatureGenerator.h"
+#include "GameObject.h"
+#include "AssetImporter.h"
 
+using namespace std;
 using namespace DirectX;
 using namespace Microsoft::WRL;
 using namespace nv_helpers_dx12;
@@ -237,53 +241,124 @@ namespace DXRDemo
 
     void Game::_OnInit()
     {
+        // Import Scene
+        AssetImporter assetImporter;
+        Scene.RootSceneObject = assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)");
+
+        _CreateDescriptorHeaps();
+        _CreateBuffers();
+        _CreateBufferViews();
+        _CreateRasterizationRootSignature();
+        _CreateRasterizationPipeline();
+
+        CreateAccelerationStructures();
+        CreateRaytracingPipeline();
+        CreateRaytracingOutputBuffer();
+        CreateShaderResourceHeap();
+        CreateShaderBindingTable();
+    }
+
+    void Game::_CreateBuffers()
+    {
         auto device = _dxContext.Device;
         CommandQueue& copyCommandQueue = *_dxContext.CopyCommandQueue;
         auto commandList = copyCommandQueue.GetCommandList();
 
-        // Upload vertex buffer data.
         ComPtr<ID3D12Resource> intermediateVertexBuffer;
-        _UpdateBufferResource(commandList,
-            &_vertexBuffer, &intermediateVertexBuffer,
-            _countof(_vertices), sizeof(VertexPosColor), _vertices);
+        // Vertex buffer 
+        {
+            _UpdateBufferResource(commandList,
+                &_vertexBuffer, &intermediateVertexBuffer,
+                _countof(_vertices), sizeof(VertexPosColor), _vertices);
+        }
 
-        // Create the vertex buffer view.
-        _vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
-        _vertexBufferView.SizeInBytes = sizeof(_vertices);
-        _vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
-
-        // Upload index buffer data.
         ComPtr<ID3D12Resource> intermediateIndexBuffer;
-        _UpdateBufferResource(commandList,
-            &_indexBuffer, &intermediateIndexBuffer,
-            _countof(_indicies), sizeof(int32_t), _indicies);
+        // Index buffer
+        {
+            _UpdateBufferResource(commandList,
+                &_indexBuffer, &intermediateIndexBuffer,
+                _countof(_indicies), sizeof(int32_t), _indicies);
+        }
 
-        // Create index buffer view.
-        _indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
-        _indexBufferView.Format = DXGI_FORMAT_R32_UINT;
-        _indexBufferView.SizeInBytes = sizeof(_indicies);
+        // Depth dencil buffer
+        {
+            D3D12_CLEAR_VALUE optimizedClearValue = {};
+            optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+            optimizedClearValue.DepthStencil = { 1.0f, 0 };
 
-        // Create the descriptor heap for the depth-stencil view.
+            CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+            CD3DX12_RESOURCE_DESC resourcedDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+                DXGI_FORMAT_D32_FLOAT,
+                _window->GetWidth(),
+                _window->GetHeight(),
+                1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+            ThrowIfFailed(device->CreateCommittedResource(
+                &heapProperties,
+                D3D12_HEAP_FLAG_NONE,
+                &resourcedDesc,
+                D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                &optimizedClearValue,
+                IID_PPV_ARGS(&_depthBuffer)
+            ));
+        }
+
+        // Clear color in upload heap
+        {
+            Game::CreateBuffer(sizeof(_clearColor), &_clearColorBuffer);
+            CopyDataToBuffer(_clearColorBuffer, _clearColor, sizeof(_clearColor));
+        }
+        
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_mvpBuffer);
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseProjectBuffer);
+        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseViewBuffer);
+
+        auto fenceValue = copyCommandQueue.ExecuteCommandList(commandList);
+        copyCommandQueue.WaitForFenceValue(fenceValue);
+    }
+
+    void Game::_CreateBufferViews()
+    {
+        // Vertex buffer view
+        {
+            _vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
+            _vertexBufferView.SizeInBytes = sizeof(_vertices);
+            _vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
+        }
+
+        // Index buffer view
+        {
+            _indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
+            _indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+            _indexBufferView.SizeInBytes = sizeof(_indicies);
+        }
+
+        // Depth stencil view
+        {
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
+            dsv.Format = DXGI_FORMAT_D32_FLOAT;
+            dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+            dsv.Texture2D.MipSlice = 0;
+            dsv.Flags = D3D12_DSV_FLAG_NONE;
+
+            _dxContext.Device->CreateDepthStencilView(
+                _depthBuffer.Get(),
+                &dsv,
+                _dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        }
+    }
+
+    void Game::_CreateDescriptorHeaps()
+    {
+        m_srvUavHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2, true);
         _dsvHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+    }
 
-        // Load the vertex shader.
-        ComPtr<ID3DBlob> vertexShaderBlob;
-        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//VertexShader.cso", &vertexShaderBlob));
-
-        // Load the pixel shader.
-        ComPtr<ID3DBlob> pixelShaderBlob;
-        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//PixelShader.cso", &pixelShaderBlob));
-
-        // Create the vertex input layout
-        D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
-
+    void Game::_CreateRasterizationRootSignature()
+    {
         // Create a root signature.
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+        if (FAILED(_dxContext.Device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
         {
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
@@ -309,9 +384,27 @@ namespace DXRDemo
         ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription,
             featureData.HighestVersion, &rootSignatureBlob, &errorBlob));
         // Create the root signature.
-        ThrowIfFailed(device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
+        ThrowIfFailed(_dxContext.Device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(),
             rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&_rootSignature)));
+    }
 
+    void Game::_CreateRasterizationPipeline()
+    {
+        // Create the vertex input layout
+        D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        };
+
+        // Load the vertex shader.
+        ComPtr<ID3DBlob> vertexShaderBlob;
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//VertexShader.cso", &vertexShaderBlob));
+
+        // Load the pixel shader.
+        ComPtr<ID3DBlob> pixelShaderBlob;
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//PixelShader.cso", &pixelShaderBlob));
+
+        // Create pipeline
         struct PipelineStateStream
         {
             CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -338,66 +431,7 @@ namespace DXRDemo
         D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
             sizeof(PipelineStateStream), &pipelineStateStream
         };
-        ThrowIfFailed(device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&_pipelineState)));
-
-        auto fenceValue = copyCommandQueue.ExecuteCommandList(commandList);
-        copyCommandQueue.WaitForFenceValue(fenceValue);
-
-        // Resize/Create the depth buffer.
-        _ResizeDepthBuffer(static_cast<int>(_viewport.Width), static_cast<int>(_viewport.Height));
-
-        // Create CBVs
-        Game::CreateBuffer(sizeof(_clearColor), &_clearColorBuffer);
-        CopyDataToBuffer(_clearColorBuffer, _clearColor, sizeof(_clearColor));
-
-        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_mvpBuffer);
-        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseProjectBuffer);
-        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseViewBuffer);
-
-        CreateAccelerationStructures();
-        CreateRaytracingPipeline();
-        CreateRaytracingOutputBuffer();
-        CreateShaderResourceHeap();
-        CreateShaderBindingTable();
-    }
-
-    void Game::_ResizeDepthBuffer(int width, int height)
-    {
-        // Flush any GPU commands that might be referencing the depth buffer.
-        _dxContext.Flush();
-
-        width = std::max(1, width);
-        height = std::max(1, height);
-
-        auto device = _dxContext.Device;
-
-        // Resize screen dependent resources.
-        // Create a depth buffer.
-        D3D12_CLEAR_VALUE optimizedClearValue = {};
-        optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        optimizedClearValue.DepthStencil = { 1.0f, 0 };
-
-        CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
-        CD3DX12_RESOURCE_DESC resourcedDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, width, height,
-            1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-        ThrowIfFailed(device->CreateCommittedResource(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourcedDesc,
-            D3D12_RESOURCE_STATE_DEPTH_WRITE,
-            &optimizedClearValue,
-            IID_PPV_ARGS(&_depthBuffer)
-        ));
-
-        // Update the depth-stencil view.
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
-        dsv.Format = DXGI_FORMAT_D32_FLOAT;
-        dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        dsv.Texture2D.MipSlice = 0;
-        dsv.Flags = D3D12_DSV_FLAG_NONE;
-
-        device->CreateDepthStencilView(_depthBuffer.Get(), &dsv,
-            _dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        ThrowIfFailed(_dxContext.Device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&_pipelineState)));
     }
 
     // Transition a resource
@@ -699,8 +733,6 @@ namespace DXRDemo
 
     void Game::CreateShaderResourceHeap()
     {
-        m_srvUavHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2, true);
-
         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_srvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
         // Unordered access view (Output image)

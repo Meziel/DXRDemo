@@ -1,5 +1,6 @@
 #include "AssetImporter.h"
 #include "MeshRenderer.h"
+#include <stdexcept>
 
 using namespace DirectX::SimpleMath;
 using namespace DirectX;
@@ -14,6 +15,11 @@ namespace DXRDemo
         const uint32_t flags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_FlipWindingOrder;
 
         const aiScene* scene = importer.ReadFile(filename, flags);
+
+        if (scene == nullptr)
+        {
+            throw std::runtime_error("Could not read from file");
+        }
 
         std::unordered_map<unsigned int, std::shared_ptr<Mesh>> meshMap;
         meshMap.reserve(scene->mNumMeshes);

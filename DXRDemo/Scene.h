@@ -1,23 +1,23 @@
 #pragma once
 
 #include <memory>
-#include "SceneObject.h"
+#include "GameObject.h"
 
 namespace DXRDemo
 {
     class Scene final
     {
     public:
-        std::shared_ptr<SceneObject> RootSceneObject;
+        std::shared_ptr<GameObject> RootSceneObject;
 
-        inline void Update()
+        inline void Update(double deltaTime)
         {
-            RootSceneObject->Update();
+            RootSceneObject->Update(deltaTime);
         }
 
         inline void Render()
         {
-            RootSceneObject->Update();
+            RootSceneObject->Render();
         }
     };
 }

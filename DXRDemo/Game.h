@@ -1,10 +1,12 @@
 #pragma once
 
 #include <directxmath.h>
+#include <combaseapi.h>
+#include <dxcapi.h>
 #include "DXContext.h"
 #include "DXRUtils/TopLevelASGenerator.h"
 #include "DXRUtils/ShaderBindingTableGenerator.h"
-#include "dxcapi.h"
+#include "Scene.h"
 
 namespace DXRDemo
 {
@@ -17,6 +19,8 @@ namespace DXRDemo
         void Render();
         void OnKeyUp(uint8_t key);
         void OnKeyDown(uint8_t key);
+
+        Scene Scene;
     
     private:
 
@@ -57,6 +61,13 @@ namespace DXRDemo
         std::vector<uint64_t> _fenceValues;
 
         void _OnInit();
+        void _CreateBuffers();
+        void _CreateDescriptorHeaps();
+        void _CreateBufferViews();
+        // Rasterization init
+        void _CreateRasterizationRootSignature();
+        void _CreateRasterizationPipeline();
+
 
         void _ResizeDepthBuffer(int width, int height);
 

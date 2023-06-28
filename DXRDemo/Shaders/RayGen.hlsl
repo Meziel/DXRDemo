@@ -43,8 +43,8 @@ void RayGen()
     // Flags can be used to specify the behavior upon hitting a surface
     RAY_FLAG_NONE,
     0xFF,
-    0.0,
     0,
+    1,
     0.0, 
     ray,
     payload);
