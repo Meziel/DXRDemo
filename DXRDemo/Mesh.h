@@ -2,9 +2,13 @@
 
 #include <vector>
 #include <directxtk/SimpleMath.h>
+#include <d3d12.h>
+#include <wrl.h>
 
 namespace DXRDemo
 {
+    class DXContext;
+
     struct Mesh final
     {
         std::vector<DirectX::SimpleMath::Vector3> Vertices;

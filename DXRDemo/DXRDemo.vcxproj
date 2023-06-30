@@ -171,6 +171,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="AssetImporter.cpp" />
     <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -7,6 +7,7 @@
 #include "DXRUtils/TopLevelASGenerator.h"
 #include "DXRUtils/ShaderBindingTableGenerator.h"
 #include "Scene.h"
+#include "MeshRenderer.h"
 
 namespace DXRDemo
 {
@@ -21,40 +22,8 @@ namespace DXRDemo
         void OnKeyDown(uint8_t key);
 
         Scene Scene;
-    
+
     private:
-
-        struct VertexPosColor
-        {
-            DirectX::XMFLOAT3 Position;
-            DirectX::XMFLOAT3 Color;
-        };
-
-        inline const static VertexPosColor _vertices[8] = {
-            { DirectX::XMFLOAT3(-1.0f, -1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-            { DirectX::XMFLOAT3(-1.0f,  1.0f, -1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-            { DirectX::XMFLOAT3(1.0f,  1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-            { DirectX::XMFLOAT3(1.0f, -1.0f, -1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-            { DirectX::XMFLOAT3(-1.0f, -1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-            { DirectX::XMFLOAT3(-1.0f,  1.0f,  1.0f), DirectX::XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-            { DirectX::XMFLOAT3(1.0f,  1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-            { DirectX::XMFLOAT3(1.0f, -1.0f,  1.0f),  DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
-
-            //{ { 0.0f, 0.25f, 0.0f }, DirectX::XMFLOAT3{ 1.0f, 0.0f, 0.0f } },
-            //{ { 0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 1.0f, 0.0f } },
-            //{ { -0.25f, -0.25f, 0.0f }, DirectX::XMFLOAT3{ 0.0f, 0.0f, 1.0f } }
-        };
-
-        inline const static int32_t _indicies[36] =
-        {
-            0, 1, 2, 0, 2, 3,
-            4, 6, 5, 4, 7, 6,
-            4, 5, 1, 4, 1, 0,
-            3, 2, 6, 3, 6, 7,
-            1, 5, 6, 1, 6, 2,
-            4, 0, 3, 4, 3, 7
-            /*0,1,2*/
-        };
 
         Window* _window;
         DXContext _dxContext;
@@ -69,7 +38,7 @@ namespace DXRDemo
         void _CreateRasterizationPipeline();
 
 
-        void _ResizeDepthBuffer(int width, int height);
+        //void _ResizeDepthBuffer(int width, int height);
 
         // Helper functions
         // Transition a resource
@@ -124,17 +93,9 @@ namespace DXRDemo
         DirectX::XMMATRIX _viewMatrix;
         DirectX::XMMATRIX _projectionMatrix;
 
-        struct AccelerationStructureBuffers
-        {
-            Microsoft::WRL::ComPtr<ID3D12Resource> pScratch; // Scratch memory for AS builder
-            Microsoft::WRL::ComPtr<ID3D12Resource> pResult; // Where the AS is
-            Microsoft::WRL::ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
-        };
-
-        Microsoft::WRL::ComPtr<ID3D12Resource> m_bottomLevelAS; // Storage for the bottom Level AS
-        nv_helpers_dx12::TopLevelASGenerator m_topLevelASGenerator;
-        AccelerationStructureBuffers m_topLevelASBuffers;
-        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> m_instances;
+        nv_helpers_dx12::TopLevelASGenerator TopLevelASGenerator;
+        AccelerationStructureBuffers TopLevelASBuffers;
+        std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>> ASInstances;
 
         /// Create the acceleration structure of an instance
         ///
@@ -149,7 +110,7 @@ namespace DXRDemo
         /// all instances of the scene
         /// \param instances : pair of BLAS and transform
         void CreateTopLevelAS(
-            Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
+            ID3D12GraphicsCommandList4* commandList,
             const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances,
             bool updateOnly = false);
         

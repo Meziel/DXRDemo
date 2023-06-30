@@ -136,6 +136,47 @@ namespace DXRDemo
         return options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
     }
 
+    void DXContext::UpdateBufferResource(ID3D12GraphicsCommandList4* commandList, ID3D12Resource** pDestinationResource, ID3D12Resource** pIntermediateResource, size_t numElements, size_t elementSize, const void* bufferData, D3D12_RESOURCE_FLAGS flags)
+    {
+        {
+            size_t bufferSize = numElements * elementSize;
+
+            // Create a committed resource for the GPU resource in a default heap
+            CD3DX12_HEAP_PROPERTIES defaultProperties(D3D12_HEAP_TYPE_DEFAULT);
+            CD3DX12_RESOURCE_DESC defaultResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags);
+            ThrowIfFailed(Device->CreateCommittedResource(
+                &defaultProperties,
+                D3D12_HEAP_FLAG_NONE,
+                &defaultResourceDesc,
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr,
+                IID_PPV_ARGS(pDestinationResource)));
+
+            // Create an committed resource for the upload
+            if (bufferData)
+            {
+                CD3DX12_HEAP_PROPERTIES uploadProperties(D3D12_HEAP_TYPE_UPLOAD);
+                CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
+                ThrowIfFailed(Device->CreateCommittedResource(
+                    &uploadProperties,
+                    D3D12_HEAP_FLAG_NONE,
+                    &uploadResourceDesc,
+                    D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr,
+                    IID_PPV_ARGS(pIntermediateResource)));
+
+                D3D12_SUBRESOURCE_DATA subresourceData = {};
+                subresourceData.pData = bufferData;
+                subresourceData.RowPitch = bufferSize;
+                subresourceData.SlicePitch = subresourceData.RowPitch;
+
+                UpdateSubresources(commandList,
+                    *pDestinationResource, *pIntermediateResource,
+                    0, 0, 1, &subresourceData);
+            }
+        }
+    }
+
     /// <summary>
     /// Enables errors to be caught by the debug layer when created
     /// DirextX 12 objects
