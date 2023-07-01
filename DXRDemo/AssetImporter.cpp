@@ -1,5 +1,6 @@
 #include "AssetImporter.h"
 #include "MeshRenderer.h"
+#include "MeshMaterial.h"
 #include <stdexcept>
 
 using namespace DirectX::SimpleMath;
@@ -22,7 +23,20 @@ namespace DXRDemo
         }
 
         std::unordered_map<unsigned int, std::shared_ptr<Mesh>> meshMap;
+        std::unordered_map<unsigned int, std::shared_ptr<MeshMaterial>> materialMap;
         meshMap.reserve(scene->mNumMeshes);
+        materialMap.reserve(scene->mNumMaterials);
+        
+        // Create materials
+        if (scene->HasMaterials())
+        {
+            for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+            {
+                _materials.push_back(_CreateMaterial(*scene->mMaterials[i]));
+                const std::shared_ptr<MeshMaterial>& newMaterial = _materials.back();
+                materialMap.insert({ i, newMaterial });
+            }
+        }
 
         // Create meshes
         if (scene->HasMeshes())
@@ -30,29 +44,38 @@ namespace DXRDemo
             for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
             {
 
-                _meshes.push_back(_CreateMesh(*scene->mMeshes[i]));
+                _meshes.push_back(_CreateMesh(*scene->mMeshes[i], materialMap));
                 const std::shared_ptr<Mesh>& newMesh = _meshes.back();
                 meshMap.insert({i, newMesh});
             }
-        }
-
-        // TODO: Create materials
-        {
-
         }
 
         // Create GameObjects from nodes
         return _CreateGameObjectFromNode(*scene->mRootNode, meshMap);
     }
 
-    std::unique_ptr<Mesh> AssetImporter::_CreateMesh(const aiMesh& meshData) const
+    std::unique_ptr<MeshMaterial> AssetImporter::_CreateMaterial(const aiMaterial& aiMaterial) const
+    {
+        unique_ptr<MeshMaterial> material = make_unique<MeshMaterial>();
+
+        aiColor3D diffuseColor(1.0f, 1.0f, 1.0f);
+        aiMaterial.Get(AI_MATKEY_COLOR_DIFFUSE, diffuseColor);
+        material->DiffuseColor = Vector4(diffuseColor.r, diffuseColor.g, diffuseColor.b, 1.f);
+
+        return material;
+    }
+
+    std::unique_ptr<Mesh> AssetImporter::_CreateMesh(
+        const aiMesh& meshData,
+        const std::unordered_map<unsigned int, std::shared_ptr<MeshMaterial>>& materialMap) const
     {
         unique_ptr<Mesh> mesh = make_unique<Mesh>();
 
         // Copy vertices
         for (unsigned int i = 0; i < meshData.mNumVertices; ++i)
         {
-            mesh->Vertices.emplace_back(reinterpret_cast<const float*>(&meshData.mVertices[i]));
+            Vector3 vertex(-meshData.mVertices[i].x, meshData.mVertices[i].y, meshData.mVertices[i].z);
+            mesh->Vertices.push_back(std::move(vertex));
         }
 
         // Copy vertex colors
@@ -86,10 +109,15 @@ namespace DXRDemo
             }
         }
 
+        // Set material
+        mesh->Material = materialMap.at(meshData.mMaterialIndex);
+
         return mesh;
     }
 
-    std::unique_ptr<GameObject> AssetImporter::_CreateGameObjectFromNode(const aiNode& aiNode, const std::unordered_map<unsigned int, std::shared_ptr<Mesh>>& meshMap)
+    std::unique_ptr<GameObject> AssetImporter::_CreateGameObjectFromNode(
+        const aiNode& aiNode,
+        const std::unordered_map<unsigned int, std::shared_ptr<Mesh>>& meshMap)
     {
         std::unique_ptr<GameObject> gameObject = std::make_unique<GameObject>();
 

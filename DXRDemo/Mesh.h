@@ -4,6 +4,7 @@
 #include <directxtk/SimpleMath.h>
 #include <d3d12.h>
 #include <wrl.h>
+#include "MeshMaterial.h"
 
 namespace DXRDemo
 {
@@ -15,5 +16,6 @@ namespace DXRDemo
         std::vector<std::vector<DirectX::SimpleMath::Vector4>> VertexColors;
         std::vector<DirectX::SimpleMath::Vector3> Normals;
         std::vector<std::uint32_t> Indices;
+        std::shared_ptr<MeshMaterial> Material;
     };
 }

@@ -4,22 +4,8 @@
 
 namespace DXRDemo
 {
-    enum class TextureType
+    struct MeshMaterial final
     {
-        Diffuse,
-        SpecularMap,
-        Ambient,
-        Emissive,
-        Heightmap,
-        NormalMap,
-        SpecularPowerMap,
-        DisplacementMap,
-        LightMap,
-        End
-    };
-
-    struct Material final
-    {
-        std::unordered_map<TextureType, std::vector<std::string>> Textures;
+        DirectX::SimpleMath::Vector4 DiffuseColor;
     };
 }

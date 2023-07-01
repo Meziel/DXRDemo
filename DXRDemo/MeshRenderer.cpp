@@ -28,7 +28,8 @@ namespace DXRDemo
         uint32_t meshIndex = 0;
         for (auto& mesh : Meshes)
         {
-            bool hasColor = mesh->VertexColors.size() > 0;
+            bool verticesHaveColor = mesh->VertexColors.size() > 0;
+            Vector4 diffuse = mesh->Material->DiffuseColor;
 
             // Create 'GPU' vertices to transfer to buffers
             std::vector<VertexPosColor> gpuVertices;
@@ -36,12 +37,13 @@ namespace DXRDemo
             {
                 VertexPosColor gpuVertex;
                 gpuVertex.Position = mesh->Vertices[i];
-                gpuVertex.Color = hasColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
+                gpuVertex.Color = diffuse;
+                /*gpuVertex.Color = hasColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
                     Vector4(
                         colorDistribution(generator),
                         colorDistribution(generator),
                         colorDistribution(generator),
-                        1.0f);
+                        1.0f);*/
 
                 gpuVertices.push_back(std::move(gpuVertex));
             }

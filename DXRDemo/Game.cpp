@@ -54,8 +54,8 @@ namespace DXRDemo
 
         const float secondsPerRotation = 10;
 
-        rotation[0] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
-        rotation[1] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
+        //rotation[0] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
+        //rotation[1] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
 
         if (elapsedSeconds > 1.0)
         {
@@ -90,14 +90,14 @@ namespace DXRDemo
         _modelMatrix *= XMMatrixRotationAxis({ 0.f, 0.f, 1.f }, rotation[2]);
 
         // Update the view matrix
-        const XMVECTOR eyePosition = XMVectorSet(0, 0, -30, 1);
+        const XMVECTOR eyePosition = XMVectorSet(0, 0, -300, 1);
         const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
         const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
         _viewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 
         // Update the projection matrix
         float aspectRatio = _viewport.Width / static_cast<float>(_viewport.Height);
-        _projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(_fov), aspectRatio, 0.1f, 100.0f);
+        _projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(_fov), aspectRatio, 0.1f, 10000.0f);
     }
 
     void Game::Render()
@@ -264,11 +264,11 @@ namespace DXRDemo
         _CreateRasterizationRootSignature();
         _CreateRasterizationPipeline();
 
-        //CreateAccelerationStructures();
-        //CreateRaytracingPipeline();
-        //CreateRaytracingOutputBuffer();
-        //CreateShaderResourceHeap();
-        //CreateShaderBindingTable();
+        CreateAccelerationStructures();
+        CreateRaytracingPipeline();
+        CreateRaytracingOutputBuffer();
+        CreateShaderResourceHeap();
+        CreateShaderBindingTable();
     }
 
     void Game::_CreateBuffers()
@@ -400,33 +400,25 @@ namespace DXRDemo
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//PixelShader.cso", &pixelShaderBlob));
 
         // Create pipeline
-        struct PipelineStateStream
-        {
-            CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
-            CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
-            CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
-            CD3DX12_PIPELINE_STATE_STREAM_VS VS;
-            CD3DX12_PIPELINE_STATE_STREAM_PS PS;
-            CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormat;
-            CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
-        } pipelineStateStream;
+        D3D12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        rasterizerDesc.FrontCounterClockwise = false;
 
-        D3D12_RT_FORMAT_ARRAY rtvFormats = {};
-        rtvFormats.NumRenderTargets = 1;
-        rtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.InputLayout = { inputLayout, _countof(inputLayout) };
+        psoDesc.pRootSignature = _rootSignature.Get();
+        psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+        psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
+        psoDesc.RasterizerState = rasterizerDesc;
+        psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+        psoDesc.SampleMask = UINT_MAX;
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psoDesc.SampleDesc.Count = 1;
+        psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 
-        pipelineStateStream.pRootSignature = _rootSignature.Get();
-        pipelineStateStream.InputLayout = { inputLayout, _countof(inputLayout) };
-        pipelineStateStream.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        pipelineStateStream.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
-        pipelineStateStream.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
-        pipelineStateStream.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-        pipelineStateStream.RTVFormats = rtvFormats;
-
-        D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
-            sizeof(PipelineStateStream), &pipelineStateStream
-        };
-        ThrowIfFailed(_dxContext.Device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&_pipelineState)));
+        ThrowIfFailed(_dxContext.Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
     }
 
     // Transition a resource
@@ -468,7 +460,7 @@ namespace DXRDemo
             // Gather all the instances into the builder helper
             for (size_t i = 0; i < instances.size(); i++)
             {
-                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(0));
+                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(i));
             }
             // As for the bottom-level AS, the building the AS requires some scratch space
             // to store temporary data in addition to the actual AS. In the case of the

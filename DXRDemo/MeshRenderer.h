@@ -28,7 +28,6 @@ namespace DXRDemo
         };
 
         std::vector<std::shared_ptr<Mesh>> Meshes;
-        //std::vector<std::shared_ptr<Material>> Materials;
 
         // Vertex buffer
         std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> VertexBuffers;

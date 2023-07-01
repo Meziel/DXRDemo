@@ -19,9 +19,14 @@ namespace DXRDemo
 
     private:
         std::vector<std::shared_ptr<Mesh>> _meshes;
-        //std::shared_ptr<MeshMaterial> _material;
+        std::vector<std::shared_ptr<MeshMaterial>> _materials;
 
-        std::unique_ptr<Mesh> _CreateMesh(const aiMesh& aiMesh) const;
-        std::unique_ptr<GameObject> _CreateGameObjectFromNode(const aiNode& aiNode, const std::unordered_map<unsigned int, std::shared_ptr<Mesh>>& meshMap);
+        std::unique_ptr<MeshMaterial> _CreateMaterial(const aiMaterial& aiMaterial) const;
+        std::unique_ptr<Mesh> _CreateMesh(
+            const aiMesh& aiMesh,
+            const std::unordered_map<unsigned int, std::shared_ptr<MeshMaterial>>& materialMap) const;
+        std::unique_ptr<GameObject> _CreateGameObjectFromNode(
+            const aiNode& aiNode,
+            const std::unordered_map<unsigned int, std::shared_ptr<Mesh>>& meshMap);
     };
 }
