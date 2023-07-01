@@ -38,7 +38,7 @@ namespace DXRDemo
                 VertexPosColor gpuVertex;
                 gpuVertex.Position = mesh->Vertices[i];
                 gpuVertex.Color = diffuse;
-                /*gpuVertex.Color = hasColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
+                /*gpuVertex.Color = verticesHaveColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
                     Vector4(
                         colorDistribution(generator),
                         colorDistribution(generator),

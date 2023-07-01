@@ -257,6 +257,7 @@ namespace DXRDemo
         // Import Scene
         AssetImporter assetImporter;
         Scene.RootSceneObject = assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)");
+        //Scene.RootSceneObject = assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)");
 
         _CreateDescriptorHeaps();
         _CreateBuffers();
