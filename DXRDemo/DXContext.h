@@ -56,7 +56,7 @@ namespace DXRDemo
             ID3D12Resource** pDestinationResource,
             ID3D12Resource** pIntermediateResource,
             size_t numElements, size_t elementSize, const void* bufferData,
-            D3D12_RESOURCE_FLAGS flags);
+            D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
     private:
 

@@ -50,18 +50,12 @@ namespace DXRDemo
         // Clear a render target view
         void _ClearRTV(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
             D3D12_CPU_DESCRIPTOR_HANDLE rtv,
-            const float* clearColor);
+            const FLOAT* clearColor);
 
         // Clear the depth of a depth-stencil view
         void _ClearDepth(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
             D3D12_CPU_DESCRIPTOR_HANDLE dsv,
-            float depth = 1.0f);
-
-        // Create a GPU buffer
-        void _UpdateBufferResource(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> commandList,
-            ID3D12Resource** pDestinationResource, ID3D12Resource** pIntermediateResource,
-            size_t numElements, size_t elementSize, const void* bufferData,
-            D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+            FLOAT depth = 1.0f);
 
         // Descriptor heap for depth buffer
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _dsvHeap;

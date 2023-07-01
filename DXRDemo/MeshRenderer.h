@@ -32,6 +32,8 @@ namespace DXRDemo
 
         // Vertex buffer
         std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> VertexBuffers;
+        std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> UploadVertexBuffers;
+        std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> UploadIndexBuffers;
         std::vector<D3D12_VERTEX_BUFFER_VIEW> VertexBufferViews;
 
         // Index buffer

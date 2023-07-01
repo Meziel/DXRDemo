@@ -5,7 +5,7 @@
 #include <d3dcompiler.h>
 #include <memory>
 
-#include "DXRHelper.h"
+#include "DXRUtils/DXRHelper.h"
 #include "DXRUtils/BottomLevelASGenerator.h"
 #include "DXRUtils/RaytracingPipelineGenerator.h"
 #include "DXRUtils/RootSignatureGenerator.h"
@@ -90,7 +90,7 @@ namespace DXRDemo
         _modelMatrix *= XMMatrixRotationAxis({ 0.f, 0.f, 1.f }, rotation[2]);
 
         // Update the view matrix
-        const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+        const XMVECTOR eyePosition = XMVectorSet(0, 0, -30, 1);
         const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
         const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
         _viewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
@@ -264,11 +264,11 @@ namespace DXRDemo
         _CreateRasterizationRootSignature();
         _CreateRasterizationPipeline();
 
-        CreateAccelerationStructures();
-        CreateRaytracingPipeline();
-        CreateRaytracingOutputBuffer();
-        CreateShaderResourceHeap();
-        CreateShaderBindingTable();
+        //CreateAccelerationStructures();
+        //CreateRaytracingPipeline();
+        //CreateRaytracingOutputBuffer();
+        //CreateShaderResourceHeap();
+        //CreateShaderBindingTable();
     }
 
     void Game::_CreateBuffers()
@@ -458,52 +458,6 @@ namespace DXRDemo
         commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
     }
 
-    void Game::_UpdateBufferResource(
-        ComPtr<ID3D12GraphicsCommandList4> commandList,
-        ID3D12Resource** pDestinationResource,
-        ID3D12Resource** pIntermediateResource,
-        size_t numElements, size_t elementSize, const void* bufferData,
-        D3D12_RESOURCE_FLAGS flags)
-    {
-        auto device = _dxContext.Device;
-
-        size_t bufferSize = numElements * elementSize;
-
-        // Create a committed resource for the GPU resource in a default heap
-        CD3DX12_HEAP_PROPERTIES defaultProperties(D3D12_HEAP_TYPE_DEFAULT);
-        CD3DX12_RESOURCE_DESC defaultResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags);
-        ThrowIfFailed(device->CreateCommittedResource(
-            &defaultProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &defaultResourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS(pDestinationResource)));
-
-        // Create an committed resource for the upload
-        if (bufferData)
-        {
-            CD3DX12_HEAP_PROPERTIES uploadProperties(D3D12_HEAP_TYPE_UPLOAD);
-            CD3DX12_RESOURCE_DESC uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-            ThrowIfFailed(device->CreateCommittedResource(
-                &uploadProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &uploadResourceDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(pIntermediateResource)));
-
-            D3D12_SUBRESOURCE_DATA subresourceData = {};
-            subresourceData.pData = bufferData;
-            subresourceData.RowPitch = bufferSize;
-            subresourceData.SlicePitch = subresourceData.RowPitch;
-
-            UpdateSubresources(commandList.Get(),
-                *pDestinationResource, *pIntermediateResource,
-                0, 0, 1, &subresourceData);
-        }
-    }
-
     void Game::CreateTopLevelAS(
         ID3D12GraphicsCommandList4* commandList,
         const std::vector<std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, DirectX::XMMATRIX>>& instances,
@@ -555,9 +509,7 @@ namespace DXRDemo
         CommandQueue& directCommandQueue = *_dxContext.DirectCommandQueue;
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
 
-        // Build the bottom AS from the Triangle vertex buffer
-        vector<AccelerationStructureBuffers> bottomLevelAccelerationStructures;
-        
+
         Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &directCommandList](MeshRenderer& meshRenderer)
         {
             meshRenderer.CreateBottomLevelAS(_dxContext, directCommandList.Get());
@@ -712,10 +664,18 @@ namespace DXRDemo
             heapPointer
         });
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
-        m_sbtHelper.AddHitGroup(L"HitGroup", {
-            reinterpret_cast<void*>(_vertexBuffer->GetGPUVirtualAddress()),
-            reinterpret_cast<void*>(_indexBuffer->GetGPUVirtualAddress()),
-        });
+        
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](const MeshRenderer& meshRenderer)
+            {
+                for (size_t i = 0; i < meshRenderer.Meshes.size(); ++i)
+                {
+                    m_sbtHelper.AddHitGroup(L"HitGroup", {
+                        reinterpret_cast<void*>(meshRenderer.VertexBuffers[i]->GetGPUVirtualAddress()),
+                        reinterpret_cast<void*>(meshRenderer.IndexBuffers[i]->GetGPUVirtualAddress()),
+                        });
+                }
+                return false;
+            });
 
         const uint32_t sbtSize = m_sbtHelper.ComputeSBTSize();
         m_sbtStorage = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(), sbtSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, nv_helpers_dx12::kUploadHeapProps);

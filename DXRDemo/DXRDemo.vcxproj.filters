@@ -53,9 +53,6 @@
     <ClInclude Include="DXRUtils\BottomLevelASGenerator.h">
       <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
-    <ClInclude Include="DXRUtils\DXRHelper.h">
-      <Filter>Source Files\DXRUtils</Filter>
-    </ClInclude>
     <ClInclude Include="DXRUtils\RaytracingPipelineGenerator.h">
       <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
@@ -91,6 +88,9 @@
     </ClInclude>
     <ClInclude Include="MeshRenderer.h">
       <Filter>Source Files\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="DXRUtils\DXRHelper.h">
+      <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,21 +1,29 @@
 #include "MeshRenderer.h"
 #include <d3d12.h>
 #include "DxContext.h"
-#include "DXRHelper.h"
+#include "DXRUtils/DXRHelper.h"
 #include "DXRUtils/BottomLevelASGenerator.h"
+#include <random>
 
+using namespace std;
 using namespace Microsoft::WRL;
 using namespace DirectX::SimpleMath;
 using namespace nv_helpers_dx12;
 
 namespace DXRDemo
 {
+    random_device device;
+    default_random_engine generator(device());
+    uniform_real_distribution<float> colorDistribution(0, 1);
+
     void MeshRenderer::CreateBuffers(
         DXContext& dxContext,
         ID3D12GraphicsCommandList4* commandList)
     {
         VertexBuffers.resize(Meshes.size());
         IndexBuffers.resize(Meshes.size());
+        UploadVertexBuffers.resize(Meshes.size());
+        UploadIndexBuffers.resize(Meshes.size());
 
         uint32_t meshIndex = 0;
         for (auto& mesh : Meshes)
@@ -28,33 +36,35 @@ namespace DXRDemo
             {
                 VertexPosColor gpuVertex;
                 gpuVertex.Position = mesh->Vertices[i];
-                gpuVertex.Color = hasColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] : Vector4();
+                gpuVertex.Color = hasColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
+                    Vector4(
+                        colorDistribution(generator),
+                        colorDistribution(generator),
+                        colorDistribution(generator),
+                        1.0f);
 
                 gpuVertices.push_back(std::move(gpuVertex));
             }
 
-            ComPtr<ID3D12Resource> intermediateBuffer;
             // Vertex buffer 
             {
                 dxContext.UpdateBufferResource(
                     commandList,
                     &VertexBuffers[meshIndex],
-                    &intermediateBuffer,
+                    &UploadVertexBuffers[meshIndex],
                     gpuVertices.size(),
                     sizeof(VertexPosColor),
-                    gpuVertices.data(),
-                    D3D12_RESOURCE_FLAG_NONE);
+                    gpuVertices.data());
             }
 
             // Index buffer
             {
                 dxContext.UpdateBufferResource(commandList,
                     &IndexBuffers[meshIndex],
-                    &intermediateBuffer,
+                    &UploadIndexBuffers[meshIndex],
                     mesh->Indices.size(),
                     sizeof(int32_t),
-                    mesh->Indices.data(),
-                    D3D12_RESOURCE_FLAG_NONE);
+                    mesh->Indices.data());
             } 
 
             ++meshIndex;
@@ -80,7 +90,7 @@ namespace DXRDemo
             {
                 IndexBufferViews[meshIndex].BufferLocation = IndexBuffers[meshIndex]->GetGPUVirtualAddress();
                 IndexBufferViews[meshIndex].Format = DXGI_FORMAT_R32_UINT;
-                IndexBufferViews[meshIndex].SizeInBytes = sizeof(uint32_t);
+                IndexBufferViews[meshIndex].SizeInBytes = static_cast<UINT>(mesh->Indices.size() * sizeof(uint32_t));
             }
 
             ++meshIndex;
@@ -144,7 +154,7 @@ namespace DXRDemo
             ++meshIndex;
         }
 
-        auto fenceValue = dxContext.DirectCommandQueue->ExecuteCommandList(commandList);
-        dxContext.DirectCommandQueue->WaitForFenceValue(fenceValue);
+        //auto fenceValue = dxContext.DirectCommandQueue->ExecuteCommandList(commandList);
+        //dxContext.DirectCommandQueue->WaitForFenceValue(fenceValue);
     }
 }
