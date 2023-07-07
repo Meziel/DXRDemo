@@ -10,7 +10,7 @@ namespace DXRDemo
     DXContext::DXContext(const Window& window, uint32_t numBuffers) :
         _numBuffers(numBuffers)
     {
-        _EnableDebugLayer();
+        //_EnableDebugLayer();
 
         _backBuffers.resize(numBuffers);
 

@@ -20,24 +20,32 @@ namespace DXRDemo
         virtual void Render();
 
         template <typename T>
-        inline bool ForEachComponent(const std::function<bool(T&)>& callback)
+        inline bool ForEachComponent(const std::function<bool(T&, std::size_t)>& callback)
+        {
+            std::size_t index = 0;
+            return ForEachComponentHelper(callback, index);
+        }
+
+        template <typename T>
+        inline bool ForEachComponentHelper(const std::function<bool(T&, std::size_t)>& callback, std::size_t& index)
         {
             for (auto& component : Components)
             {
                 T* componentType = dynamic_cast<T*>(component.get());
                 if (componentType != nullptr)
                 {
-                    bool shouldReturn = callback(*componentType);
+                    bool shouldReturn = callback(*componentType, index);
                     if (shouldReturn)
                     {
                         return true;
                     }
+                    ++index;
                 }
             }
 
             for (const std::shared_ptr<GameObject>& child : Children)
             {
-                if (child->ForEachComponent<T>(callback))
+                if (child->ForEachComponentHelper<T>(callback, index))
                 {
                     return true;
                 }

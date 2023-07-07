@@ -139,7 +139,7 @@ namespace DXRDemo
             directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             
             // Render all geometry
-            Scene.RootSceneObject->ForEachComponent<MeshRenderer>([&directCommandList](MeshRenderer& meshRenderer)
+            Scene.RootSceneObject->ForEachComponent<MeshRenderer>([&directCommandList](MeshRenderer& meshRenderer, size_t index)
             {
                 for (uint32_t i = 0; i < meshRenderer.Meshes.size(); ++i)
                 {
@@ -165,7 +165,7 @@ namespace DXRDemo
                 instance.second = _modelMatrix;
             }
             // TODO: this is crashing
-            //CreateTopLevelAS(directCommandList.Get(), ASInstances, true);
+            CreateTopLevelAS(directCommandList.Get(), ASInstances, true);
 
             // Update inverse view and projection matrices
             XMMATRIX inverseProjectionMatrix = XMMatrixInverse(nullptr, _projectionMatrix);
@@ -302,7 +302,7 @@ namespace DXRDemo
         CommandQueue& copyCommandQueue = *_dxContext.CopyCommandQueue;
         auto commandList = copyCommandQueue.GetCommandList();
 
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &commandList](MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &commandList](MeshRenderer& meshRenderer, size_t index)
             {
                 meshRenderer.CreateBuffers(_dxContext, commandList.Get());
                 return false;
@@ -346,7 +346,7 @@ namespace DXRDemo
 
     void Game::_CreateBufferViews()
     {
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](MeshRenderer& meshRenderer, size_t index)
             {
                 meshRenderer.CreateBufferViews(_dxContext);
                 return false;
@@ -485,7 +485,7 @@ namespace DXRDemo
             // Gather all the instances into the builder helper
             for (size_t i = 0; i < instances.size(); i++)
             {
-                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(i));
+                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(2 * i));
             }
             // As for the bottom-level AS, the building the AS requires some scratch space
             // to store temporary data in addition to the actual AS. In the case of the
@@ -527,7 +527,7 @@ namespace DXRDemo
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
 
 
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &directCommandList](MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &directCommandList](MeshRenderer& meshRenderer, size_t index)
         {
             meshRenderer.CreateBottomLevelAS(_dxContext, directCommandList.Get());
             return false;
@@ -536,7 +536,7 @@ namespace DXRDemo
 
         // Buid instances
         ASInstances.clear();
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](MeshRenderer& meshRenderer, size_t index)
         {
             for (auto& bottomLevelBuffer : meshRenderer.BottomLevelASBuffers)
             {
@@ -598,6 +598,12 @@ namespace DXRDemo
         return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
+    ComPtr<ID3D12RootSignature> Game::CreateShadowSignature()
+    {
+        nv_helpers_dx12::RootSignatureGenerator rsc;
+        return rsc.Generate(_dxContext.Device.Get(), true);
+    }
+
     ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
@@ -613,7 +619,7 @@ namespace DXRDemo
         m_rayGenSignature = CreateRayGenSignature();
         m_missSignature = CreateMissSignature();
         m_hitSignature = CreateHitSignature();
-        m_shadowSignature = CreateHitSignature();
+        m_shadowSignature = CreateShadowSignature();
 
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//RayGen.cso", &m_rayGenLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Miss.cso", &m_missLibrary));
@@ -631,9 +637,9 @@ namespace DXRDemo
         pipeline.AddHitGroup(L"ShadowHitGroup", L"ShadowClosestHit");
 
         pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), {L"RayGen"});
-        pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss", L"ShadowMiss"});
+        pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss"});
         pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), {L"HitGroup"});
-        pipeline.AddRootSignatureAssociation(m_shadowSignature.Get(), {L"ShadowHitGroup"});
+        pipeline.AddRootSignatureAssociation(m_shadowSignature.Get(), {L"ShadowHitGroup", L"ShadowMiss"});
 
         pipeline.SetMaxPayloadSize(4 * sizeof(float)); // RGB + distance
 
@@ -700,7 +706,7 @@ namespace DXRDemo
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
         m_sbtHelper.AddMissProgram(L"ShadowMiss", {});
         
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &heapPointer](const MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, heapPointer](const MeshRenderer& meshRenderer, size_t index)
             {
                 for (size_t i = 0; i < meshRenderer.Meshes.size(); ++i)
                 {

@@ -115,6 +115,7 @@ namespace DXRDemo
         Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRayGenSignature();
         Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateHitSignature();
         Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateMissSignature();
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateShadowSignature();
         void CreateRaytracingPipeline();
         Microsoft::WRL::ComPtr<ID3DBlob> m_rayGenLibrary;
         Microsoft::WRL::ComPtr<ID3DBlob> m_hitLibrary;

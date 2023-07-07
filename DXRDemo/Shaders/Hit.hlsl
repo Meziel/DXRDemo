@@ -13,9 +13,10 @@ RaytracingAccelerationStructure SceneBVH : register(t2);
 [shader("closesthit")] 
 void ClosestHit(inout HitInfo payload, Attributes attrib) 
 {
-    float3 lightPos = float3(0, 500, 0);
+    float3 lightPos = float3(0, 52, 0);
     float3 worldHit = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
     float3 lightDir = normalize(lightPos - worldHit);
+    float lightDistance = length(lightPos - worldHit);
     
     // Fire a shadow ray. The direction is hard-coded here, but can be fetched
     // from a constant-buffer
@@ -23,10 +24,9 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
     ray.Origin = worldHit;
     ray.Direction = lightDir;
     ray.TMin = 0.01;
-    ray.TMax = 100000;
+    ray.TMax = lightDistance - 0.001;
     
     ShadowHitInfo shadowPayload;
-    shadowPayload.isHit = false;
     
     // Trace the ray
     TraceRay(
