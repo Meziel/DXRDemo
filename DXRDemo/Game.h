@@ -119,9 +119,11 @@ namespace DXRDemo
         Microsoft::WRL::ComPtr<ID3DBlob> m_rayGenLibrary;
         Microsoft::WRL::ComPtr<ID3DBlob> m_hitLibrary;
         Microsoft::WRL::ComPtr<ID3DBlob> m_missLibrary;
+        Microsoft::WRL::ComPtr<ID3DBlob> m_shadowLibrary;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rayGenSignature;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_hitSignature;
         Microsoft::WRL::ComPtr<ID3D12RootSignature> m_missSignature;
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> m_shadowSignature;
         // Ray tracing pipeline state
         Microsoft::WRL::ComPtr<ID3D12StateObject> m_rtStateObject;
         // Ray tracing pipeline state properties, retaining the shader identifiers

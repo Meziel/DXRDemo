@@ -164,7 +164,8 @@ namespace DXRDemo
             {
                 instance.second = _modelMatrix;
             }
-            CreateTopLevelAS(directCommandList.Get(), ASInstances, true);
+            // TODO: this is crashing
+            //CreateTopLevelAS(directCommandList.Get(), ASInstances, true);
 
             // Update inverse view and projection matrices
             XMMATRIX inverseProjectionMatrix = XMMatrixInverse(nullptr, _projectionMatrix);
@@ -256,8 +257,31 @@ namespace DXRDemo
     {
         // Import Scene
         AssetImporter assetImporter;
-        Scene.RootSceneObject = assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)");
-        //Scene.RootSceneObject = assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)");
+        Scene.RootSceneObject = make_shared<GameObject>();
+        Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
+
 
         _CreateDescriptorHeaps();
         _CreateBuffers();
@@ -514,9 +538,9 @@ namespace DXRDemo
         ASInstances.clear();
         Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](MeshRenderer& meshRenderer)
         {
-            for (AccelerationStructureBuffers& bottomLevelBuffer : meshRenderer.BottomLevelASBuffers)
+            for (auto& bottomLevelBuffer : meshRenderer.BottomLevelASBuffers)
             {
-                ASInstances.push_back({ bottomLevelBuffer.pResult, _modelMatrix }); // TODO: fix model matrices
+                ASInstances.push_back({ bottomLevelBuffer, _modelMatrix }); // TODO: fix model matrices
             }
             return false;
         });
@@ -538,19 +562,21 @@ namespace DXRDemo
         // Heap
         rsc.AddHeapRangesParameter({
             {
-                0 /*u0*/,
-                1 /*1 descriptor */,
-                0 /*use the implicit register space 0*/,
-                D3D12_DESCRIPTOR_RANGE_TYPE_UAV /* UAV representing the output buffer*/,
-                0 /*heap slot where the UAV is defined*/
+                0, // Register number (u0)
+                1, // Num descriptors
+                0, // Register space
+                D3D12_DESCRIPTOR_RANGE_TYPE_UAV, // Type
+                0  // Heap slot
             },
+            // Top-level acceleration structure
             {
-                0 /*t0*/,
-                1,
-                0,
-                D3D12_DESCRIPTOR_RANGE_TYPE_SRV /*Top-level acceleration structure*/,
-                1} 
-            });
+                0, // Register number (t0)
+                1, // Num descriptors
+                0, // Register space
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV, // Type
+                1  // Heap slot
+            }
+        });
         return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
@@ -559,6 +585,16 @@ namespace DXRDemo
         nv_helpers_dx12::RootSignatureGenerator rsc;
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 0); // Vertices
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 1); // Indices
+        rsc.AddHeapRangesParameter({
+            // Top-level acceleration structure
+            {
+                2, // Register number
+                1, // Num descriptors
+                0, // Register space
+                D3D12_DESCRIPTOR_RANGE_TYPE_SRV, // Type
+                1  // Heap slot
+            }
+        }); 
         return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
@@ -577,28 +613,33 @@ namespace DXRDemo
         m_rayGenSignature = CreateRayGenSignature();
         m_missSignature = CreateMissSignature();
         m_hitSignature = CreateHitSignature();
+        m_shadowSignature = CreateHitSignature();
 
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//RayGen.cso", &m_rayGenLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Miss.cso", &m_missLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Hit.cso", &m_hitLibrary));
+        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//ShadowRay.cso", &m_shadowLibrary));
 
         nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext.Device.Get());
 
         pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
         pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
         pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit" });
+        pipeline.AddLibrary(m_shadowLibrary.Get(), { L"ShadowClosestHit", L"ShadowMiss"});
 
         pipeline.AddHitGroup(L"HitGroup", L"ClosestHit");
+        pipeline.AddHitGroup(L"ShadowHitGroup", L"ShadowClosestHit");
 
         pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), {L"RayGen"});
-        pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss"});
+        pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss", L"ShadowMiss"});
         pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), {L"HitGroup"});
+        pipeline.AddRootSignatureAssociation(m_shadowSignature.Get(), {L"ShadowHitGroup"});
 
         pipeline.SetMaxPayloadSize(4 * sizeof(float)); // RGB + distance
 
         pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
 
-        pipeline.SetMaxRecursionDepth(1);
+        pipeline.SetMaxRecursionDepth(2);
 
         m_rtStateObject = pipeline.Generate();
         ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));
@@ -657,15 +698,18 @@ namespace DXRDemo
             heapPointer
         });
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
+        m_sbtHelper.AddMissProgram(L"ShadowMiss", {});
         
-        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this](const MeshRenderer& meshRenderer)
+        Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &heapPointer](const MeshRenderer& meshRenderer)
             {
                 for (size_t i = 0; i < meshRenderer.Meshes.size(); ++i)
                 {
                     m_sbtHelper.AddHitGroup(L"HitGroup", {
                         reinterpret_cast<void*>(meshRenderer.VertexBuffers[i]->GetGPUVirtualAddress()),
                         reinterpret_cast<void*>(meshRenderer.IndexBuffers[i]->GetGPUVirtualAddress()),
-                        });
+                        heapPointer
+                    });
+                    m_sbtHelper.AddHitGroup(L"ShadowHitGroup", {});
                 }
                 return false;
             });

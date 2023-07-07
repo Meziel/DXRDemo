@@ -40,7 +40,7 @@ namespace DXRDemo
         std::vector<D3D12_INDEX_BUFFER_VIEW> IndexBufferViews;
 
         // Acceleration structure buffers
-        std::vector<AccelerationStructureBuffers> BottomLevelASBuffers;
+        std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> BottomLevelASBuffers;
 
         void CreateBuffers(DXContext& dxContext, ID3D12GraphicsCommandList4* commandList);
         void CreateBufferViews(DXContext& dxContext);

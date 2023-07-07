@@ -38,12 +38,12 @@ namespace DXRDemo
                 VertexPosColor gpuVertex;
                 gpuVertex.Position = mesh->Vertices[i];
                 gpuVertex.Color = diffuse;
-                /*gpuVertex.Color = verticesHaveColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
-                    Vector4(
-                        colorDistribution(generator),
-                        colorDistribution(generator),
-                        colorDistribution(generator),
-                        1.0f);*/
+                //gpuVertex.Color = verticesHaveColor && i < mesh->VertexColors[0].size() ? mesh->VertexColors[0][i] :
+                //    Vector4(
+                //        colorDistribution(generator),
+                //        colorDistribution(generator),
+                //        colorDistribution(generator),
+                //        1.0f);
 
                 gpuVertices.push_back(std::move(gpuVertex));
             }
@@ -143,15 +143,14 @@ namespace DXRDemo
             // Once the sizes are obtained, the application is responsible for allocating
             // the necessary buffers. Since the entire generation will be done on the GPU,
             // we can directly allocate those on the default heap
-            AccelerationStructureBuffers buffers;
-            buffers.pScratch = nv_helpers_dx12::CreateBuffer(dxContext.Device.Get(), scratchSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, nv_helpers_dx12::kDefaultHeapProps);
-            buffers.pResult = nv_helpers_dx12::CreateBuffer(dxContext.Device.Get(), resultSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
+            Microsoft::WRL::ComPtr<ID3D12Resource> scratch = nv_helpers_dx12::CreateBuffer(dxContext.Device.Get(), scratchSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, nv_helpers_dx12::kDefaultHeapProps);
+            Microsoft::WRL::ComPtr<ID3D12Resource> buffer = nv_helpers_dx12::CreateBuffer(dxContext.Device.Get(), resultSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nv_helpers_dx12::kDefaultHeapProps);
 
             // Build the acceleration structure. Note that this call integrates a barrier
             // on the generated AS, so that it can be used to compute a top-level AS right
             // after this method.
-            bottomLevelAS.Generate(commandList, buffers.pScratch.Get(), buffers.pResult.Get(), false, nullptr);
-            BottomLevelASBuffers.push_back(std::move(buffers));
+            bottomLevelAS.Generate(commandList, scratch.Get(), buffer.Get(), false, nullptr);
+            BottomLevelASBuffers.push_back(std::move(buffer));
 
             ++meshIndex;
         }

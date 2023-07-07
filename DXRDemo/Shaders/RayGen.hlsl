@@ -43,9 +43,9 @@ void RayGen()
     // Flags can be used to specify the behavior upon hitting a surface
     RAY_FLAG_NONE,
     0xFF,
-    0,
-    1,
-    0.0, 
+    0, // Normal ray type
+    2, // Hit group stride
+    0, // Miss normal ray type 
     ray,
     payload);
     
