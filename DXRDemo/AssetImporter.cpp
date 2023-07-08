@@ -78,6 +78,17 @@ namespace DXRDemo
             mesh->Vertices.push_back(std::move(vertex));
         }
 
+        // Normals
+        if (meshData.HasNormals())
+        {
+            mesh->Normals.reserve(meshData.mNumVertices);
+            for (unsigned int i = 0; i < meshData.mNumVertices; ++i)
+            {
+                Vector3 normal(-meshData.mNormals[i].x, meshData.mNormals[i].y, meshData.mNormals[i].z);
+                mesh->Normals.push_back(std::move(normal));
+            }
+        }
+
         // Copy vertex colors
         {
             unsigned int colorChannelCount = meshData.GetNumColorChannels();

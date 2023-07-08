@@ -1,3 +1,10 @@
+struct VertexData
+{
+    float3 Position : POSITION;
+    float3 Normal : NORMAL;
+    float4 Color : COLOR;
+};
+
 struct HitInfo
 {
   float4 colorAndDistance;

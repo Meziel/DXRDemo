@@ -1,22 +1,21 @@
 #include "Common.hlsl"
 
-struct STriVertex
-{
-    float3 vertex;
-    float4 color;
-};
-
-StructuredBuffer<STriVertex> BTriVertex : register(t0);
+StructuredBuffer<VertexData> vertices : register(t0);
 StructuredBuffer<int> indices : register(t1);
 RaytracingAccelerationStructure SceneBVH : register(t2);
 
 [shader("closesthit")] 
 void ClosestHit(inout HitInfo payload, Attributes attrib) 
 {
+    // TODO: move to constant
     float3 lightPos = float3(0, 52, 0);
+    float lightRadius = 200;
+    
     float3 worldHit = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
     float3 lightDir = normalize(lightPos - worldHit);
     float lightDistance = length(lightPos - worldHit);
+    
+    float attenuation = saturate(1.0f - (lightDistance / lightRadius));
     
     // Fire a shadow ray. The direction is hard-coded here, but can be fetched
     // from a constant-buffer
@@ -44,8 +43,8 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
     // Default color
     float3 barycentrics = float3(1 - attrib.bary.x - attrib.bary.y, attrib.bary.x, attrib.bary.y);
     uint vertId = 3 * PrimitiveIndex();
-    float3 hitColor = BTriVertex[indices[vertId + 0]].color.rgb * barycentrics.x +
-                      BTriVertex[indices[vertId + 1]].color.rgb * barycentrics.y +
-                      BTriVertex[indices[vertId + 2]].color.rgb * barycentrics.z;
-    payload.colorAndDistance = float4(hitColor * shadowColorFactor, RayTCurrent());
+    float3 hitColor = vertices[indices[vertId + 0]].Color.rgb * barycentrics.x +
+                      vertices[indices[vertId + 1]].Color.rgb * barycentrics.y +
+                      vertices[indices[vertId + 2]].Color.rgb * barycentrics.z;
+    payload.colorAndDistance = float4(hitColor * shadowColorFactor * attenuation, RayTCurrent());
 }

@@ -24,6 +24,7 @@ namespace DXRDemo
         struct VertexPosColor
         {
             DirectX::XMFLOAT3 Position;
+            DirectX::XMFLOAT3 Normal;
             DirectX::XMFLOAT4 Color;
         };
 
