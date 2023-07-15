@@ -2,7 +2,7 @@
 #define COMMON_H
 
 static const float PI = 3.14159265f;
-static const uint MAX_SAMPLES = 100;
+static const uint MAX_SAMPLES = 1000;
 static const uint MAX_DEPTH = 2;
 
 struct VertexData

@@ -23,31 +23,21 @@ float3 RandomUnitVector(float2 random)
 }
 
 float3 RandomUnitVectorHemisphere(float2 random, float3 normal)
-{
-    // Make sure random.y is in the range [0, 0.5] to generate a point in a hemisphere
-    random.y *= 0.5;
+{    
+    float z = 1 - 2 * random.x;
+    float r = sqrt(max(1 - z * z, 0));
+    float phi = 2 * PI * random.y;
+    float3 unitVector = float3(r * cos(phi), r * sin(phi), z);
 
-    // Generate the azimuthal angle (phi), 2pi radians around
-    float phi = 2.0 * 3.14159265358979323846 * random.x;
+    //// Create a rotation matrix that aligns the z-axis with the normal
+    //float3 up = abs(normal.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+    //float3 right = normalize(cross(up, normal));
+    //up = normalize(cross(normal, right));
 
-    // Generate the polar angle (theta)
-    float theta = acos(1.0 - random.y);
+    //float3x3 rotationMatrix = float3x3(right, up, normal);
 
-    // Convert from spherical to Cartesian coordinates
-    float3 unitVector;
-    unitVector.x = sin(theta) * cos(phi);
-    unitVector.y = sin(theta) * sin(phi);
-    unitVector.z = cos(theta);
-
-    // Create a rotation matrix that aligns the z-axis with the normal
-    float3 up = abs(normal.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-    float3 right = normalize(cross(up, normal));
-    up = cross(normal, right);
-
-    float3x3 rotationMatrix = float3x3(right, up, normal);
-
-    // Rotate the vector by the matrix
-    unitVector = mul(unitVector, rotationMatrix);
+    //// Rotate the vector by the matrix
+    //unitVector = mul(rotationMatrix, unitVector);
 
     return unitVector;
 }
@@ -57,7 +47,7 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
 {
     // TODO: move to constant
     float3 lightPos = float3(0, 52.4924, 0);
-    float lightIntensity = 1500;
+    float lightIntensity = 100;
     
     float3 worldHit = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
     float3 lightDirection = normalize(lightPos - worldHit);
@@ -167,8 +157,6 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
         ray.Origin = worldHit;
         ray.TMin = 0.01;
         ray.TMax = 100000;
-    
-        float bsdfReflection = bsdf * 0.1;
         
         [unroll]
         for (int i = 0; i < NUM_RAY_DIRECTION; ++i)
@@ -187,9 +175,9 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
             
             float n_dot_r = max(dot(ray.Direction, hitNormal), 0);
             
-            float3 irradience = liPayload.Li * n_dot_r;
+            float3 irradience = liPayload.Li * abs(n_dot_r);
             
-            payload.Li += bsdfReflection * hitColor * irradience * (2 * PI);
+            payload.Li += bsdf * hitColor * irradience * (4 * PI);
         }
     }
 }
