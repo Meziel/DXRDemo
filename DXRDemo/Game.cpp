@@ -410,12 +410,11 @@ namespace DXRDemo
 
     void Game::_CreateRasterizationPipeline()
     {
-        // Create the vertex input layout
-        // TODO: Move to mesh renderer
-        D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
+        D3D12_INPUT_ELEMENT_DESC InputLayout[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "EMISSION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
 
         // Load the vertex shader.
@@ -431,7 +430,7 @@ namespace DXRDemo
         rasterizerDesc.FrontCounterClockwise = false;
 
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputLayout, _countof(inputLayout) };
+        psoDesc.InputLayout = { InputLayout, _countof(InputLayout) };
         psoDesc.pRootSignature = _rootSignature.Get();
         psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
         psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
@@ -643,11 +642,11 @@ namespace DXRDemo
         pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), {L"HitGroup"});
         pipeline.AddRootSignatureAssociation(m_shadowSignature.Get(), {L"ShadowHitGroup", L"ShadowMiss"});
 
-        pipeline.SetMaxPayloadSize(4 * sizeof(float)); // RGB + distance
+        pipeline.SetMaxPayloadSize(16 * sizeof(float)); // RGB + distance
 
         pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
 
-        pipeline.SetMaxRecursionDepth(2);
+        pipeline.SetMaxRecursionDepth(31);
 
         m_rtStateObject = pipeline.Generate();
         ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));

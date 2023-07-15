@@ -1,8 +1,8 @@
-#include "Common.hlsl"
+#include "Common.hlsli"
 
 struct ClearColor
 {
-    float4 color;
+    float4 Color;
 };
 
 ConstantBuffer<ClearColor> ClearColorCB : register(b0);
@@ -10,5 +10,7 @@ ConstantBuffer<ClearColor> ClearColorCB : register(b0);
 [shader("miss")]
 void Miss(inout HitInfo payload : SV_RayPayload)
 {
-    payload.colorAndDistance = float4(ClearColorCB.color.rgb, -1.f);
+    payload.Li = ClearColorCB.Color.rgb;
+    payload.Distance = -1.f;
+
 }

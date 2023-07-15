@@ -58,9 +58,19 @@ namespace DXRDemo
     {
         unique_ptr<MeshMaterial> material = make_unique<MeshMaterial>();
 
+        // Get Material Name
+        aiString name = aiMaterial.GetName();
+        material->Name = name.C_Str();
+
+        // Get Diffuse
         aiColor3D diffuseColor(1.0f, 1.0f, 1.0f);
         aiMaterial.Get(AI_MATKEY_COLOR_DIFFUSE, diffuseColor);
         material->DiffuseColor = Vector4(diffuseColor.r, diffuseColor.g, diffuseColor.b, 1.f);
+
+        // Get Emissive
+        aiColor3D emissiveColor(0.0f, 0.0f, 0.0f);
+        aiMaterial.Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor);
+        material->EmissionColor = Vector3(emissiveColor.r, emissiveColor.g, emissiveColor.b);
 
         return material;
     }

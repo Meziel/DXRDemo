@@ -1,4 +1,4 @@
-#include "Common.hlsl"
+#include "Common.hlsli"
 
 [shader("closesthit")]
 void ShadowClosestHit(inout ShadowHitInfo hit, Attributes attrib)

@@ -9,7 +9,6 @@ namespace DXRDemo
 {
     class DXContext;
 
-    // TODO: move somewhere else
     struct AccelerationStructureBuffers
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> pScratch; // Scratch memory for AS builder
@@ -26,6 +25,7 @@ namespace DXRDemo
             DirectX::XMFLOAT3 Position;
             DirectX::XMFLOAT3 Normal;
             DirectX::XMFLOAT4 Color;
+            DirectX::XMFLOAT3 Emission;
         };
 
         std::vector<std::shared_ptr<Mesh>> Meshes;

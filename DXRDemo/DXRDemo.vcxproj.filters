@@ -148,7 +148,7 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Common.hlsl">
+    <FxCompile Include="Shaders\Common.hlsli">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\Hit.hlsl">
@@ -169,5 +169,10 @@
     <FxCompile Include="Shaders\ShadowRay.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\RandomNumberGenerator.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
