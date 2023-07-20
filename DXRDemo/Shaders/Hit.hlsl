@@ -22,24 +22,54 @@ float3 RandomUnitVector(float2 random)
     return unitVector;
 }
 
+// Quaternion-Quaternion Multiplication
+float4 QMul(float4 q1, float4 q2)
+{
+    float3 v1 = q1.xyz, v2 = q2.xyz;
+    float s1 = q1.w, s2 = q2.w;
+    float3 v = s1 * v2 + s2 * v1 + cross(v1, v2);
+    float s = s1 * s2 - dot(v1, v2);
+    return float4(v, s);
+}
+
+// Quaternion-Vector Multiplication
+float3 QMulVector(float4 q, float3 v)
+{
+    float4 v4 = float4(v, 0);
+    float4 iq = float4(-q.xyz, q.w);
+    float4 u = QMul(QMul(q, v4), iq);
+    return u.xyz;
+}
+
 float3 RandomUnitVectorHemisphere(float2 random, float3 normal)
-{    
-    float z = 1 - 2 * random.x;
+{
+    float z = random.x;
     float r = sqrt(max(1 - z * z, 0));
     float phi = 2 * PI * random.y;
     float3 unitVector = float3(r * cos(phi), r * sin(phi), z);
+    
+    float3 ref = float3(0.0, 0.0, 1.0);
+    float3 newRef = normal; // Define your d2, make sure it's normalized
+    
+    // Compute the rotation quaternion between ref and d2
+    float d = dot(ref, newRef);
+    float4 quaternion;
+    if (d > 0.99999)
+    {
+        return unitVector;
+    }
+    else if (d < -0.99999)
+    {
+        return -unitVector;
+    }
 
-    //// Create a rotation matrix that aligns the z-axis with the normal
-    //float3 up = abs(normal.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-    //float3 right = normalize(cross(up, normal));
-    //up = normalize(cross(normal, right));
+    float3 c = cross(ref, newRef);
+    float s = sqrt((1 + d) * 2);
+    float invs = 1 / s;
+    quaternion = normalize(float4(c * invs, s * 0.5));
 
-    //float3x3 rotationMatrix = float3x3(right, up, normal);
-
-    //// Rotate the vector by the matrix
-    //unitVector = mul(rotationMatrix, unitVector);
-
-    return unitVector;
+    // Rotate d1 using quaternion
+    return QMulVector(quaternion, unitVector);
 }
 
 [shader("closesthit")] 
@@ -47,7 +77,7 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
 {
     // TODO: move to constant
     float3 lightPos = float3(0, 52.4924, 0);
-    float lightIntensity = 100;
+    float lightIntensity = 50;
     
     float3 worldHit = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
     float3 lightDirection = normalize(lightPos - worldHit);
@@ -118,12 +148,15 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
             return;
         }
         
-        uint rngState = RNG::SeedThread(payload.Depth * MAX_DEPTH
-                                        + payload.Sample * MAX_SAMPLES);
+        uint seed = ((((payload.Depth * MAX_DEPTH)
+            + payload.Sample) * MAX_SAMPLES
+            + DispatchRaysIndex().x) * DispatchRaysDimensions().x
+            + DispatchRaysIndex().y) * DispatchRaysDimensions().y;
         
-        float randomX = RNG::Random01(rngState);
-        rngState += 1;
-        float randomY = RNG::Random01(rngState);
+        
+        float randomX = RNG::Random01(seed);
+        seed += 1;
+        float randomY = RNG::Random01(seed);
         
         // TODO: importance sampling
         //float stddev = 1 / 360;
@@ -177,7 +210,7 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
             
             float3 irradience = liPayload.Li * abs(n_dot_r);
             
-            payload.Li += bsdf * hitColor * irradience * (4 * PI);
+            payload.Li += bsdf * hitColor * irradience * (2 * PI);
         }
     }
 }

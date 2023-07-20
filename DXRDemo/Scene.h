@@ -14,10 +14,5 @@ namespace DXRDemo
         {
             RootSceneObject->Update(deltaTime);
         }
-
-        inline void Render()
-        {
-            RootSceneObject->Render();
-        }
     };
 }

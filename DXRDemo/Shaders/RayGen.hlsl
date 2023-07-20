@@ -1,4 +1,5 @@
 #include "Common.hlsli"
+#include "RandomNumberGenerator.hlsli"
 
 struct InverseMatrix
 {
@@ -14,6 +15,12 @@ RWTexture2D<float4> gOutput : register(u0);
 // Raytracing acceleration structure, accessed as a SRV
 RaytracingAccelerationStructure SceneBVH : register(t0);
 
+float rand_1_05(in float2 uv)
+{
+    float2 noise = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+    return abs(noise.x + noise.y) * 0.5;
+}
+
 [shader("raygeneration")]
 void RayGen()
 {
@@ -22,7 +29,7 @@ void RayGen()
     payload.Depth = 0;
     
     uint2 launchIndex = DispatchRaysIndex().xy;
-    float2 dims = float2(DispatchRaysDimensions().xy);
+    float2 dims = DispatchRaysDimensions().xy;
     // 0.5 centers pixel from [0, width-1] to [0.5, width-0.5] 
     float2 pixelCoordNDC = (((launchIndex.xy + 0.5f) / dims.xy) * 2.f - 1.f);
     float aspectRatio = dims.x / dims.y;

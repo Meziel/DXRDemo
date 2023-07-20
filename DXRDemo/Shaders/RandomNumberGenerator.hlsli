@@ -25,6 +25,10 @@ namespace RNG
         seed = seed ^ (seed >> 4);
         seed *= 0x27d4eb2d;
         seed = seed ^ (seed >> 15);
+        
+        //seed ^= (seed >> 20) ^ (seed >> 12);
+        //return seed ^ (seed >> 7) ^ (seed >> 4);
+        
         return seed;
     }
 

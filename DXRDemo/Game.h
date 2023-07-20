@@ -145,7 +145,6 @@ namespace DXRDemo
         void CreateBuffer(size_t bufferSize, ID3D12Resource** buffer);
         void CopyDataToBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> buffer, void* data, size_t bufferSize);
         Microsoft::WRL::ComPtr<ID3D12Resource> _clearColorBuffer;
-        Microsoft::WRL::ComPtr<ID3D12Resource> _mvpBuffer;
         Microsoft::WRL::ComPtr<ID3D12Resource> _inverseProjectBuffer;
         Microsoft::WRL::ComPtr<ID3D12Resource> _inverseViewBuffer;
     };

@@ -92,6 +92,9 @@
     <ClInclude Include="DXRUtils\DXRHelper.h">
       <Filter>Source Files\DXRUtils</Filter>
     </ClInclude>
+    <ClInclude Include="OscillatorComponent.h">
+      <Filter>Source Files\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">

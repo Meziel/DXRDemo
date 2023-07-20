@@ -11,6 +11,7 @@
 #include "DXRUtils/RootSignatureGenerator.h"
 #include "GameObject.h"
 #include "MeshRenderer.h"
+#include "OscillatorComponent.h"
 #include "AssetImporter.h"
 
 using namespace std;
@@ -52,10 +53,12 @@ namespace DXRDemo
         double secondsSinceLastTick = deltaTime.count() * 1e-9;
         elapsedSeconds += secondsSinceLastTick;
 
-        const float secondsPerRotation = 10;
+        //const float secondsPerRotation = 10;
 
         //rotation[0] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
         //rotation[1] += static_cast<float>(2 * XM_PI / secondsPerRotation * secondsSinceLastTick);
+
+        Scene.Update(secondsSinceLastTick);
 
         if (elapsedSeconds > 1.0)
         {
@@ -85,12 +88,15 @@ namespace DXRDemo
         }
 
         // Update the model matrix
-        _modelMatrix = XMMatrixRotationAxis({ 1.f, 0.f, 0.f }, rotation[0]);
-        _modelMatrix *= XMMatrixRotationAxis({ 0.f, 1.f, 0.f }, rotation[1]);
-        _modelMatrix *= XMMatrixRotationAxis({ 0.f, 0.f, 1.f }, rotation[2]);
+        Scene.RootSceneObject->Transform.UpdateModelMatrix();
+        Scene.RootSceneObject->ForEachChild([](GameObject& child, std::size_t i)
+        {
+            child.Transform.UpdateModelMatrix();
+            return false;
+        });
 
         // Update the view matrix
-        const XMVECTOR eyePosition = XMVectorSet(0, 0, -300, 1);
+        const XMVECTOR eyePosition = XMVectorSet(0, 0, -250, 1);
         const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
         const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
         _viewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
@@ -119,10 +125,6 @@ namespace DXRDemo
         // Raster
         if (!_dxContext.IsRaytracingEnabled())
         {
-            // Update the MVP matrix
-            XMMATRIX mvpMatrix = XMMatrixMultiply(_modelMatrix, _viewMatrix);
-            mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
-
             // Indicate that the back buffer will be used as a render target
             _TransitionResource(directCommandList, backBuffer,
                 D3D12_RESOURCE_STATE_PRESENT,
@@ -132,15 +134,18 @@ namespace DXRDemo
             _ClearRTV(directCommandList, rtv, _clearColor);
             _ClearDepth(directCommandList, dsv);
 
-            //directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
-            CopyDataToBuffer(_mvpBuffer, &mvpMatrix, sizeof(mvpMatrix));
-            directCommandList->SetGraphicsRootConstantBufferView(0, _mvpBuffer->GetGPUVirtualAddress());
-
             directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             
             // Render all geometry
-            Scene.RootSceneObject->ForEachComponent<MeshRenderer>([&directCommandList](MeshRenderer& meshRenderer, size_t index)
+            Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &directCommandList](MeshRenderer& meshRenderer, size_t index)
             {
+
+                XMMATRIX mvpMatrix = XMMatrixMultiply(meshRenderer.Parent->Transform.ModelMatrix, _viewMatrix);
+                mvpMatrix = XMMatrixMultiply(mvpMatrix, _projectionMatrix);
+
+                CopyDataToBuffer(meshRenderer.Parent->Transform.MvpBuffer, &mvpMatrix, sizeof(mvpMatrix));
+                directCommandList->SetGraphicsRootConstantBufferView(0, meshRenderer.Parent->Transform.MvpBuffer->GetGPUVirtualAddress());
+
                 for (uint32_t i = 0; i < meshRenderer.Meshes.size(); ++i)
                 {
                     directCommandList->IASetVertexBuffers(0, 1, &meshRenderer.VertexBufferViews[i]);
@@ -160,11 +165,16 @@ namespace DXRDemo
         else
         {
             // Update acceleration structures
-            for (auto& instance : ASInstances)
+            int instanceNumber = 0;
+            Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &instanceNumber](MeshRenderer& meshRenderer, size_t index)
             {
-                instance.second = _modelMatrix;
-            }
-            // TODO: this is crashing
+                for (auto& bottomLevelBuffer : meshRenderer.BottomLevelASBuffers)
+                {
+                    ASInstances[instanceNumber].second = meshRenderer.Parent->Transform.ModelMatrix;
+                    ++instanceNumber;
+                }
+                return false;
+            });
             CreateTopLevelAS(directCommandList.Get(), ASInstances, true);
 
             // Update inverse view and projection matrices
@@ -258,7 +268,18 @@ namespace DXRDemo
         // Import Scene
         AssetImporter assetImporter;
         Scene.RootSceneObject = make_shared<GameObject>();
-        Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)"));
+        
+        Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)"));
+        Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\sphere\sphere.obj)"));
+
+        auto& sphere = Scene.RootSceneObject->Children.back()->Children.back();
+        sphere->Transform.Scale *= 10;
+        sphere->Transform.Position.y = 20;
+        auto oscillator = std::make_shared<OscillatorComponent>();
+        oscillator->Radius = 30;
+        oscillator->Speed = XM_PI / 2;
+        sphere->AddComponent(oscillator);
+
         //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
         //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
         //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
@@ -336,7 +357,11 @@ namespace DXRDemo
             CopyDataToBuffer(_clearColorBuffer, _clearColor, sizeof(_clearColor));
         }
         
-        Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_mvpBuffer);
+        Scene.RootSceneObject->ForEachChild([this](GameObject& gameObject, std::size_t i)
+        {
+            CreateBuffer(sizeof(DirectX::XMMATRIX), &gameObject.Transform.MvpBuffer);
+            return false;
+        });
         Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseProjectBuffer);
         Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseViewBuffer);
 
@@ -541,7 +566,7 @@ namespace DXRDemo
         {
             for (auto& bottomLevelBuffer : meshRenderer.BottomLevelASBuffers)
             {
-                ASInstances.push_back({ bottomLevelBuffer, _modelMatrix }); // TODO: fix model matrices
+                ASInstances.push_back({ bottomLevelBuffer, meshRenderer.Parent->Transform.ModelMatrix }); // TODO: fix model matrices
             }
             return false;
         });

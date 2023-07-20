@@ -153,7 +153,7 @@ namespace DXRDemo
         // Create MeshRenderer component
         if (aiNode.mNumMeshes > 0)
         {
-            gameObject->Components.push_back(std::make_shared<MeshRenderer>());
+            gameObject->AddComponent(std::make_shared<MeshRenderer>());
             MeshRenderer& meshRenderer = static_cast<MeshRenderer&>(*gameObject->Components.back());
 
             for (unsigned int i = 0; i < aiNode.mNumMeshes; ++i)
@@ -165,7 +165,7 @@ namespace DXRDemo
         // Populate children
         for (unsigned int i = 0; i < aiNode.mNumChildren; ++i)
         {
-            gameObject->Children.emplace_back(_CreateGameObjectFromNode(*aiNode.mChildren[i], meshMap));
+            gameObject->AddChild(_CreateGameObjectFromNode(*aiNode.mChildren[i], meshMap));
         }
 
         return gameObject;
