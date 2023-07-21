@@ -3,6 +3,7 @@
 
 StructuredBuffer<VertexData> vertices : register(t0);
 StructuredBuffer<int> indices : register(t1);
+ConstantBuffer<Settings> settings : register(b0);
 RaytracingAccelerationStructure SceneBVH : register(t2);
 
 float3 RandomUnitVector(float2 random)
@@ -143,13 +144,13 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
     //}
     
     {
-        if (payload.Depth >= MAX_DEPTH)
+        if (payload.Depth >= settings.bounces)
         {
             return;
         }
         
-        uint seed = ((((payload.Depth * MAX_DEPTH)
-            + payload.Sample) * MAX_SAMPLES
+        uint seed = ((((payload.Depth * settings.bounces)
+            + payload.Sample) * settings.samples
             + DispatchRaysIndex().x) * DispatchRaysDimensions().x
             + DispatchRaysIndex().y) * DispatchRaysDimensions().y;
         

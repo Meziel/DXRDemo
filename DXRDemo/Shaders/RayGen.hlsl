@@ -6,8 +6,10 @@ struct InverseMatrix
     matrix invMatrix;
 };
 
-ConstantBuffer<InverseMatrix> InvProjection : register(b0);
-ConstantBuffer<InverseMatrix> InvView : register(b1);
+ConstantBuffer<InverseMatrix> invProjection : register(b0);
+ConstantBuffer<InverseMatrix> invView : register(b1);
+
+ConstantBuffer<Settings> settings : register(b2);
 
 // Raytracing output texture, accessed as a UAV
 RWTexture2D<float4> gOutput : register(u0);
@@ -36,9 +38,9 @@ void RayGen()
     
     // Define initial ray, consisting of origin, direction, and the min-max distance values
     RayDesc ray;
-    ray.Origin = mul(InvView.invMatrix, float4(0, 0, 0, 1)); // Origin of camera in world space
-    float4 target = mul(InvProjection.invMatrix, float4(pixelCoordNDC.x, -pixelCoordNDC.y, 1, 1));
-    ray.Direction = mul(InvView.invMatrix, float4(target.xyz, 0));
+    ray.Origin = mul(invView.invMatrix, float4(0, 0, 0, 1)); // Origin of camera in world space
+    float4 target = mul(invProjection.invMatrix, float4(pixelCoordNDC.x, -pixelCoordNDC.y, 1, 1));
+    ray.Direction = mul(invView.invMatrix, float4(target.xyz, 0));
     ray.TMin = 0.01;
     ray.TMax = 100000;
     
@@ -46,7 +48,7 @@ void RayGen()
     
     float3 Li = (float3) 0;
     
-    for (uint i = 0; i < MAX_SAMPLES; ++i)
+    for (uint i = 0; i < settings.samples; ++i)
     {
         payload.Sample = i;
         
@@ -61,7 +63,7 @@ void RayGen()
         payload);
         Li += payload.Li;
     }
-    Li /= MAX_SAMPLES;
+    Li /= settings.samples;
     
     gOutput[launchIndex] = float4(Li, 1.f);
 }

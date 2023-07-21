@@ -19,6 +19,12 @@ namespace DXRDemo
         Game(Window& window, uint32_t width, uint32_t height);
         ~Game();
 
+        struct Settings
+        {
+            int32_t Samples = 50;
+            int32_t Bounces = 2;
+        };
+
         void Update();
         void Render();
         void OnKeyUp(uint8_t key);
@@ -27,6 +33,7 @@ namespace DXRDemo
         Scene Scene;
 
         double FPS = 0;
+        Settings UserSettings;
 
     private:
 
@@ -152,8 +159,10 @@ namespace DXRDemo
 
         void CreateBuffer(size_t bufferSize, ID3D12Resource** buffer);
         void CopyDataToBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> buffer, void* data, size_t bufferSize);
+        
         Microsoft::WRL::ComPtr<ID3D12Resource> _clearColorBuffer;
         Microsoft::WRL::ComPtr<ID3D12Resource> _inverseProjectBuffer;
         Microsoft::WRL::ComPtr<ID3D12Resource> _inverseViewBuffer;
+        Microsoft::WRL::ComPtr<ID3D12Resource> _settingsViewBuffer;
     };
 }

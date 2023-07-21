@@ -119,13 +119,11 @@ namespace DXRDemo
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         
-        int samples = 500;
-        int bounces = 3;
         {
             ImGui::Begin("Settings");
 
-            ImGui::SliderInt("Samples", &samples, 1, 1000);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::SliderInt("Bounces", &bounces, 1, 10);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderInt("Samples", &UserSettings.Samples, 1, 1000);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderInt("Bounces", &UserSettings.Bounces, 1, 10);            // Edit 1 float using a slider from 0.0f to 1.0f
 
             ImGui::Text("FPS: %.1f", FPS);
             ImGui::End();
@@ -212,6 +210,9 @@ namespace DXRDemo
 
             XMMATRIX inverseViewMatrix = XMMatrixInverse(nullptr, _viewMatrix);
             CopyDataToBuffer(_inverseViewBuffer, &inverseViewMatrix, sizeof(inverseViewMatrix));
+
+            // Copy settings
+            CopyDataToBuffer(_settingsViewBuffer, &UserSettings, sizeof(Settings));
 
             // Transition output buffer from copy to unordered access (
             CD3DX12_RESOURCE_BARRIER transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -373,7 +374,8 @@ namespace DXRDemo
         });
         Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseProjectBuffer);
         Game::CreateBuffer(sizeof(DirectX::XMMATRIX), &_inverseViewBuffer);
-
+        Game::CreateBuffer(sizeof(Settings), &_settingsViewBuffer);
+        
         auto fenceValue = copyCommandQueue.ExecuteCommandList(commandList);
         copyCommandQueue.WaitForFenceValue(fenceValue);
     }
@@ -609,12 +611,11 @@ namespace DXRDemo
     ComPtr<ID3D12RootSignature> Game::CreateRayGenSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
-        // Inverse projection CBV
-        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 0);
-        // Inverse view CBV
-        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 1);
-        // Heap
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 0); // Inverse projection CBV
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 1); // Inverse view CBV
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 2); // Settings
         rsc.AddHeapRangesParameter({
+            // Output
             {
                 0, // Register number (u0)
                 1, // Num descriptors
@@ -639,6 +640,7 @@ namespace DXRDemo
         nv_helpers_dx12::RootSignatureGenerator rsc;
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 0); // Vertices
         rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_SRV, 1); // Indices
+        rsc.AddRootParameter(D3D12_ROOT_PARAMETER_TYPE_CBV, 0); // Settings
         rsc.AddHeapRangesParameter({
             // Top-level acceleration structure
             {
@@ -755,6 +757,7 @@ namespace DXRDemo
         m_sbtHelper.AddRayGenerationProgram(L"RayGen", {
             reinterpret_cast<void*>(_inverseProjectBuffer->GetGPUVirtualAddress()),
             reinterpret_cast<void*>(_inverseViewBuffer->GetGPUVirtualAddress()),
+            reinterpret_cast<void*>(_settingsViewBuffer->GetGPUVirtualAddress()),
             heapPointer
         });
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
@@ -767,6 +770,7 @@ namespace DXRDemo
                     m_sbtHelper.AddHitGroup(L"HitGroup", {
                         reinterpret_cast<void*>(meshRenderer.VertexBuffers[i]->GetGPUVirtualAddress()),
                         reinterpret_cast<void*>(meshRenderer.IndexBuffers[i]->GetGPUVirtualAddress()),
+                        reinterpret_cast<void*>(_settingsViewBuffer->GetGPUVirtualAddress()),
                         heapPointer
                     });
                     m_sbtHelper.AddHitGroup(L"ShadowHitGroup", {});
