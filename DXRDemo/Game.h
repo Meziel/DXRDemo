@@ -144,6 +144,7 @@ namespace DXRDemo
         void CreateShaderResourceHeap();
         Microsoft::WRL::ComPtr<ID3D12Resource> m_outputResource;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvUavHeap;
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_guiHeap;
 
         void CreateShaderBindingTable();
         nv_helpers_dx12::ShaderBindingTableGenerator m_sbtHelper;

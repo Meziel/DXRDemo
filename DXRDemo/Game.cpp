@@ -186,8 +186,6 @@ namespace DXRDemo
                 return false;
             });
 
-            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
-
             _TransitionResource(directCommandList, backBuffer,
                 D3D12_RESOURCE_STATE_RENDER_TARGET,
                 D3D12_RESOURCE_STATE_PRESENT);
@@ -256,13 +254,15 @@ namespace DXRDemo
             // Copy raytrace output to render target
             directCommandList->CopyResource(backBuffer.Get(), m_outputResource.Get());
 
-            //ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
-
             transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
                 D3D12_RESOURCE_STATE_COPY_DEST,
                 D3D12_RESOURCE_STATE_PRESENT);
             directCommandList->ResourceBarrier(1, &transition);
         }
+
+        std::vector<ID3D12DescriptorHeap*> uiHeaps = { m_guiHeap.Get() };
+        directCommandList->SetDescriptorHeaps(static_cast<UINT>(uiHeaps.size()), uiHeaps.data());
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
 
         // Present
          _fenceValues[_dxContext.GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
@@ -404,6 +404,7 @@ namespace DXRDemo
     void Game::_CreateDescriptorHeaps()
     {
         m_srvUavHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 2, true);
+        m_guiHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, true);
         _dsvHeap = _dxContext.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
     }
 
@@ -493,10 +494,10 @@ namespace DXRDemo
         // Setup Platform/Renderer backends
         ImGui_ImplWin32_Init(_window->GetHWND());
         ImGui_ImplDX12_Init(_dxContext.Device.Get(), _dxContext.GetNumberBuffers(), DXGI_FORMAT_R8G8B8A8_UNORM,
-            m_srvUavHeap.Get(),
+            m_guiHeap.Get(),
             // You'll need to designate a descriptor from your descriptor heap for Dear ImGui to use internally for its font texture's SRV
-            m_srvUavHeap->GetCPUDescriptorHandleForHeapStart(),
-            m_srvUavHeap->GetGPUDescriptorHandleForHeapStart());
+            m_guiHeap->GetCPUDescriptorHandleForHeapStart(),
+            m_guiHeap->GetGPUDescriptorHandleForHeapStart());
     }
 
     // Transition a resource
