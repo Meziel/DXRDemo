@@ -8,6 +8,8 @@
 #include "DXRUtils/ShaderBindingTableGenerator.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
+#include <imgui.h>
+#include <imgui_impl_dx12.h>
 
 namespace DXRDemo
 {
@@ -15,6 +17,7 @@ namespace DXRDemo
     {
     public:
         Game(Window& window, uint32_t width, uint32_t height);
+        ~Game();
 
         void Update();
         void Render();
@@ -36,6 +39,8 @@ namespace DXRDemo
         // Rasterization init
         void _CreateRasterizationRootSignature();
         void _CreateRasterizationPipeline();
+
+        void _InitializeGUI();
 
 
         //void _ResizeDepthBuffer(int width, int height);

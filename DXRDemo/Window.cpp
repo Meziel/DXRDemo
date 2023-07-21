@@ -2,6 +2,8 @@
 
 #include "Window.h"
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 namespace DXRDemo
 {
     Window::Window(HINSTANCE hInstance, std::wstring title, uint32_t width, uint32_t height) :
@@ -114,6 +116,9 @@ namespace DXRDemo
 
     LRESULT CALLBACK Window::_WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
+        if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+            return true;
+
         // Don't handle events until DirextX initialized
         if (_initialized)
         {

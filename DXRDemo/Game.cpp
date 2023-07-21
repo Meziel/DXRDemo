@@ -35,6 +35,13 @@ namespace DXRDemo
         _OnInit();
     }
 
+    Game::~Game()
+    {
+        ImGui_ImplDX12_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+    }
+
     void Game::Update()
     {
         static uint64_t frameCounter = 0;
@@ -108,6 +115,11 @@ namespace DXRDemo
 
     void Game::Render()
     {
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow(); // Show demo window! :)
+
         CommandQueue& directCommandQueue = *_dxContext.DirectCommandQueue;
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
         
@@ -121,6 +133,8 @@ namespace DXRDemo
         directCommandList->RSSetScissorRects(1, &_scissorRect);
 
         directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+        ImGui::Render();
 
         // Raster
         if (!_dxContext.IsRaytracingEnabled())
@@ -156,6 +170,8 @@ namespace DXRDemo
 
                 return false;
             });
+
+            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
 
             _TransitionResource(directCommandList, backBuffer,
                 D3D12_RESOURCE_STATE_RENDER_TARGET,
@@ -229,16 +245,22 @@ namespace DXRDemo
             // Copy raytrace output to render target
             directCommandList->CopyResource(backBuffer.Get(), m_outputResource.Get());
 
+            //ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
+
             transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
                 D3D12_RESOURCE_STATE_COPY_DEST,
                 D3D12_RESOURCE_STATE_PRESENT);
             directCommandList->ResourceBarrier(1, &transition);
         }
 
+        
+
         // Present
          _fenceValues[_dxContext.GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
          _dxContext.Present();
          directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext.GetCurrentBackBufferIndex()]);
+    
+         //while (true) {}
     }
 
     void Game::OnKeyUp(uint8_t key)
@@ -280,30 +302,6 @@ namespace DXRDemo
         oscillator->Speed = XM_PI / 2;
         sphere->AddComponent(oscillator);
 
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-        //Scene.RootSceneObject->Children.push_back(assetImporter.ImportAsset(R"(Content\monkey\monkey.obj)"));
-
-
         _CreateDescriptorHeaps();
         _CreateBuffers();
         _CreateBufferViews();
@@ -315,6 +313,8 @@ namespace DXRDemo
         CreateRaytracingOutputBuffer();
         CreateShaderResourceHeap();
         CreateShaderBindingTable();
+
+        _InitializeGUI();
     }
 
     void Game::_CreateBuffers()
@@ -470,6 +470,24 @@ namespace DXRDemo
         psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 
         ThrowIfFailed(_dxContext.Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_pipelineState)));
+    }
+
+    void Game::_InitializeGUI()
+    {
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Platform/Renderer backends
+        ImGui_ImplWin32_Init(_window->GetHWND());
+        ImGui_ImplDX12_Init(_dxContext.Device.Get(), _dxContext.GetNumberBuffers(), DXGI_FORMAT_R8G8B8A8_UNORM,
+            m_srvUavHeap.Get(),
+            // You'll need to designate a descriptor from your descriptor heap for Dear ImGui to use internally for its font texture's SRV
+            m_srvUavHeap->GetCPUDescriptorHandleForHeapStart(),
+            m_srvUavHeap->GetGPUDescriptorHandleForHeapStart());
     }
 
     // Transition a resource
@@ -671,7 +689,7 @@ namespace DXRDemo
 
         pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
 
-        pipeline.SetMaxRecursionDepth(31);
+        pipeline.SetMaxRecursionDepth(4);
 
         m_rtStateObject = pipeline.Generate();
         ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));

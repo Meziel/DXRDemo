@@ -69,7 +69,7 @@ namespace DXRDemo
         UINT _rtvDescriptorSize;
 
         bool _vSyncEnabled = true;
-        bool _raytracingEnabled = true;
+        bool _raytracingEnabled = false;
         bool _tearingSupported = false;
 
         void _EnableDebugLayer();

@@ -7,6 +7,8 @@
 #include "utilities.h"
 #include "framework.h"
 #include "Resource.h"
+#include <imgui.h>
+#include <imgui_impl_win32.h>
 
 namespace DXRDemo
 {
