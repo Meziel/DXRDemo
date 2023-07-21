@@ -301,15 +301,15 @@ namespace DXRDemo
         Scene.RootSceneObject = make_shared<GameObject>();
         
         Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)"));
-        Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\sphere\sphere.obj)"));
+        //Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\sphere\sphere.obj)"));
 
-        auto& sphere = Scene.RootSceneObject->Children.back()->Children.back();
-        sphere->Transform.Scale *= 10;
-        sphere->Transform.Position.y = 20;
-        auto oscillator = std::make_shared<OscillatorComponent>();
-        oscillator->Radius = 30;
-        oscillator->Speed = XM_PI / 2;
-        sphere->AddComponent(oscillator);
+        //auto& sphere = Scene.RootSceneObject->Children.back()->Children.back();
+        //sphere->Transform.Scale *= 10;
+        //sphere->Transform.Position.y = 20;
+        //auto oscillator = std::make_shared<OscillatorComponent>();
+        //oscillator->Radius = 30;
+        //oscillator->Speed = XM_PI / 2;
+        //sphere->AddComponent(oscillator);
 
         _CreateDescriptorHeaps();
         _CreateBuffers();
