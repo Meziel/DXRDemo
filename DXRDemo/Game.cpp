@@ -701,7 +701,7 @@ namespace DXRDemo
 
         pipeline.SetMaxAttributeSize(2 * sizeof(float)); // barycentric coordinates
 
-        pipeline.SetMaxRecursionDepth(4);
+        pipeline.SetMaxRecursionDepth(31);
 
         m_rtStateObject = pipeline.Generate();
         ThrowIfFailed(m_rtStateObject->QueryInterface(IID_PPV_ARGS(&m_rtStateObjectProps)));
