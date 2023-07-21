@@ -26,6 +26,8 @@ namespace DXRDemo
 
         Scene Scene;
 
+        double FPS = 0;
+
     private:
 
         Window* _window;

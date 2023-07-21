@@ -70,8 +70,8 @@ namespace DXRDemo
         if (elapsedSeconds > 1.0)
         {
             char buffer[500];
-            auto fps = frameCounter / elapsedSeconds;
-            sprintf_s(buffer, 500, "FPS: %f\n", fps);
+            FPS = frameCounter / elapsedSeconds;
+            sprintf_s(buffer, 500, "FPS: %f\n", FPS);
             OutputDebugStringA(buffer);
 
             frameCounter = 0;
@@ -118,7 +118,20 @@ namespace DXRDemo
         ImGui_ImplDX12_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow(); // Show demo window! :)
+        
+        int samples = 500;
+        int bounces = 3;
+        {
+            ImGui::Begin("Settings");
+
+            ImGui::SliderInt("Samples", &samples, 1, 1000);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderInt("Bounces", &bounces, 1, 10);            // Edit 1 float using a slider from 0.0f to 1.0f
+
+            ImGui::Text("FPS: %.1f", FPS);
+            ImGui::End();
+        }
+
+        ImGui::Render();
 
         CommandQueue& directCommandQueue = *_dxContext.DirectCommandQueue;
         auto directCommandList = directCommandQueue.GetCommandList(_pipelineState.Get());
@@ -134,7 +147,9 @@ namespace DXRDemo
 
         directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
-        ImGui::Render();
+        // Set descriptor heap
+        std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
+        directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
 
         // Raster
         if (!_dxContext.IsRaytracingEnabled())
@@ -200,10 +215,6 @@ namespace DXRDemo
             XMMATRIX inverseViewMatrix = XMMatrixInverse(nullptr, _viewMatrix);
             CopyDataToBuffer(_inverseViewBuffer, &inverseViewMatrix, sizeof(inverseViewMatrix));
 
-            // Set descriptor heap
-            std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
-            directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
-
             // Transition output buffer from copy to unordered access (
             CD3DX12_RESOURCE_BARRIER transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             directCommandList->ResourceBarrier(1, &transition);
@@ -252,8 +263,6 @@ namespace DXRDemo
                 D3D12_RESOURCE_STATE_PRESENT);
             directCommandList->ResourceBarrier(1, &transition);
         }
-
-        
 
         // Present
          _fenceValues[_dxContext.GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
