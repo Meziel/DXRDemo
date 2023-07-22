@@ -138,7 +138,7 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
     seed += 1;
     randomSample.y = RNG::Random01(seed);
     
-    float px = 1 / (2 * PI);
+    float px = 1 / (4 * PI);
     if (settings.importanceSamplingEnabled)
     {
         float probToLight = settings.importanceSamplingPercentage;

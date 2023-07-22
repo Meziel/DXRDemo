@@ -127,6 +127,7 @@ namespace DXRDemo
             ImGui::SetWindowPos({10, 10});
             
             ImGui::Text("Ray Tracing Enabled: %s", _dxContext.IsRaytracingEnabled() ? "True" : "False");
+            ImGui::Text("VSync Enabled: %s", _dxContext.IsVSyncEnabled() ? "True" : "False");
             
             ImGui::SeparatorText("Ray Tracing");
             ////////////////////////////////////
