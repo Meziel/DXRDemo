@@ -46,7 +46,7 @@ void RayGen()
     
     int depth = 0;
     
-    float3 Li = (float3) 0;
+    double3 Li = (float3) 0;
     
     for (uint i = 0; i < settings.samples; ++i)
     {

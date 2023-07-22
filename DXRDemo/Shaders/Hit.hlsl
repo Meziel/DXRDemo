@@ -6,23 +6,6 @@ StructuredBuffer<int> indices : register(t1);
 ConstantBuffer<Settings> settings : register(b0);
 RaytracingAccelerationStructure SceneBVH : register(t2);
 
-float3 RandomUnitVector(float2 random)
-{
-    // Generate the azimuthal angle (phi), 2pi radians around
-    float phi = 2.0 * PI * random.x;
-
-    // Generate the polar angle (theta)
-    float theta = acos(2.0 * random.y - 1.0);
-
-    // Convert from spherical to Cartesian coordinates
-    float3 unitVector;
-    unitVector.x = sin(theta) * cos(phi);
-    unitVector.y = sin(theta) * sin(phi);
-    unitVector.z = cos(theta);
-
-    return unitVector;
-}
-
 // Quaternion-Quaternion Multiplication
 float4 QMul(float4 q1, float4 q2)
 {
@@ -42,35 +25,58 @@ float3 QMulVector(float4 q, float3 v)
     return u.xyz;
 }
 
-float3 RandomUnitVectorHemisphere(float2 random, float3 normal)
+
+float3 RandomUnitVector(float2 randomSample)
 {
-    float z = random.x;
+    float z = randomSample.x * 2 - 1;
     float r = sqrt(max(1 - z * z, 0));
-    float phi = 2 * PI * random.y;
-    float3 unitVector = float3(r * cos(phi), r * sin(phi), z);
-    
-    float3 ref = float3(0.0, 0.0, 1.0);
-    float3 newRef = normal; // Define your d2, make sure it's normalized
-    
+    float phi = 2 * PI * randomSample.y;
+    return float3(r * cos(phi), r * sin(phi), z);
+}
+
+float3 ChangeDirectionReference(float3 direction, float3 oldRef, float3 newRef)
+{
     // Compute the rotation quaternion between ref and d2
-    float d = dot(ref, newRef);
+    float d = dot(oldRef, newRef);
     float4 quaternion;
     if (d > 0.99999)
     {
-        return unitVector;
+        return direction;
     }
     else if (d < -0.99999)
     {
-        return -unitVector;
+        return -direction;
     }
 
-    float3 c = cross(ref, newRef);
+    float3 c = cross(oldRef, newRef);
     float s = sqrt((1 + d) * 2);
     float invs = 1 / s;
     quaternion = normalize(float4(c * invs, s * 0.5));
 
     // Rotate d1 using quaternion
-    return QMulVector(quaternion, unitVector);
+    return QMulVector(quaternion, direction);
+}
+
+float3 RandomUnitVectorHemisphere(float2 randomSample)
+{
+    float z = randomSample.x;
+    float r = sqrt(max(1 - z * z, 0));
+    float phi = 2 * PI * randomSample.y;
+    return float3(r * cos(phi), r * sin(phi), z);
+}
+
+float ComputeBSDF(float3 v1, float3 v2, float3 normal)
+{
+    if (dot(normal, v2) >= 0)
+    {
+        return 1 / (2 * PI);
+    }
+    return 0;
+}
+
+float TranslateDomainToRange(float x, float d1, float d2, float r1, float r2)
+{
+    return r1 + ((x - d1) / (d2 - d1)) * (r2 - r1);
 }
 
 [shader("closesthit")] 
@@ -78,7 +84,7 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
 {
     // TODO: move to constant
     float3 lightPos = float3(0, 52.4924, 0);
-    float lightIntensity = 50;
+    float3 lightRadius = 20;
     
     float3 worldHit = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
     float3 lightDirection = normalize(lightPos - worldHit);
@@ -86,8 +92,6 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
     
     float3 barycentrics = float3(1 - attrib.bary.x - attrib.bary.y, attrib.bary.x, attrib.bary.y);
     uint vertId = 3 * PrimitiveIndex();
-    
-    float bsdf = 1 / (2 * PI);
     
     VertexData vertexHitData[3] =
     {
@@ -108,81 +112,64 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
                            vertexHitData[1].Emission.rgb * barycentrics.y +
                            vertexHitData[2].Emission.rgb * barycentrics.z;
     
-    payload.Li = hitEmissive * lightIntensity;
+    payload.Li = hitEmissive * settings.lightIntensity;
     
-    //float attenuation = saturate(1.0f - (lightDistance / lightRadius));
-    
-    // Fire a shadow ray. The direction is hard-coded here, but can be fetched
-    // from a constant-buffer 
-    //{
-    //    RayDesc ray;
-    //    ray.Origin = worldHit;
-    //    ray.Direction = lightDirection;
-    //    ray.TMin = 0.01;
-    //    ray.TMax = lightDistance - 0.001;
- 
-
-    //    ShadowHitInfo shadowPayload;
-    
-    //    // Trace the ray
-    //    TraceRay(
-    //      SceneBVH,
-    //      RAY_FLAG_NONE,
-    //      0xFF,
-    //      1, // Shadow ray type
-    //      2, // Hit group stride
-    //      1, // Miss shadow ray type
-    //      ray,
-    //      shadowPayload);
-    
-    //    float shadowColorFactor = shadowPayload.isHit ? 0.2 : 1.0;
-    
-    //    float n_dot_l = max(dot(lightDirection, hitNormal), 0);
-    
-    //    payload.Li += float3(
-    //        bsdf * hitColor * shadowColorFactor * n_dot_l * 4 * PI);
-    //}
-    
+    if (length(payload.Li) > 0)
     {
-        if (payload.Depth >= settings.bounces)
-        {
-            return;
-        }
-        
-        uint seed = ((((payload.Depth * settings.bounces)
-            + payload.Sample) * settings.samples
-            + DispatchRaysIndex().x) * DispatchRaysDimensions().x
-            + DispatchRaysIndex().y) * DispatchRaysDimensions().y;
-        
-        
-        float randomX = RNG::Random01(seed);
-        seed += 1;
-        float randomY = RNG::Random01(seed);
-        
-        // TODO: importance sampling
-        //float stddev = 1 / 360;
-        //float mean = 0;
-        
-        //// Use Box-Muller transform to generate Gaussian distributed numbers
-        //float2 norm = sqrt(-2.0 * log(randomX)) * float2(cos(2.0 * PI * randomY), sin(2.0 * PI * randomY));
-
-        //// Apply mean and standard deviation
-        //norm *= stddev;
-        //norm += mean;
-        
-        //float3 randomRayOffset = float3(randomX, randomY, randomZ);
-        //float3 randomRayDirection = lightDirection + randomRayOffset;
-        
-        float3 randomRayDirection = RandomUnitVectorHemisphere(float2(randomX, randomY), hitNormal);
-        
-        static const int NUM_RAY_DIRECTION = 1;
-        float3 rayDirections[] =
-        {
-            randomRayDirection
-            //reflect(WorldRayDirection(), hitNormal),
-            //lightDirection,
-        };
+        return;
+    }
     
+    if (payload.Depth >= settings.bounces)
+    {
+        return;
+    }
+        
+    uint seed = ((((payload.Depth * settings.bounces)
+        + payload.Sample) * settings.samples
+        + DispatchRaysIndex().x) * DispatchRaysDimensions().x
+        + DispatchRaysIndex().y) * DispatchRaysDimensions().y;
+        
+    float random = RNG::Random01(seed);
+    seed += 1;
+        
+    // Random sample
+    float2 randomSample;
+    randomSample.x = RNG::Random01(seed);
+    seed += 1;
+    randomSample.y = RNG::Random01(seed);
+    
+    float px = 1 / (2 * PI);
+    if (settings.importanceSamplingEnabled)
+    {
+        float probToLight = settings.importanceSamplingPercentage;
+        //float lightZ = 0.9;
+        float lightZ = cos(atan(lightRadius / lightDistance));
+        if (random > (1 - probToLight))
+        {
+            // Choose direction towards light
+            randomSample.x = randomSample.x = TranslateDomainToRange(randomSample.x, -1, 1, lightZ, 1);
+            float percOfSurfaceArea = (1 - lightZ) / 2;
+            float surfaceArea = 4 * PI * percOfSurfaceArea;
+            px = probToLight * (1 / surfaceArea);
+        }
+        else
+        {
+            // Choose direction away from light
+            randomSample.x = TranslateDomainToRange(randomSample.x, -1, 1, -1, lightZ);
+            float percOfSurfaceArea = (lightZ + 1) / 2;
+            float surfaceArea = 4 * PI * percOfSurfaceArea;
+            px = (1 - probToLight) * (1 / surfaceArea);
+        }
+    }
+        
+    // Generate direction
+    float3 randomRayDirection = RandomUnitVector(randomSample);
+    randomRayDirection = ChangeDirectionReference(randomRayDirection, float3(0, 0, 1), lightDirection);
+    
+    float bsdf = ComputeBSDF(-WorldRayDirection(), randomRayDirection, hitNormal);
+        
+    if (bsdf > 0)
+    {
         HitInfo liPayload;
         liPayload.Depth = payload.Depth + 1;
         liPayload.Sample = payload.Sample;
@@ -191,27 +178,22 @@ void ClosestHit(inout HitInfo payload, Attributes attrib)
         ray.Origin = worldHit;
         ray.TMin = 0.01;
         ray.TMax = 100000;
+        ray.Direction = randomRayDirection;
         
-        [unroll]
-        for (int i = 0; i < NUM_RAY_DIRECTION; ++i)
-        {
-            ray.Direction = rayDirections[i];
-        
-            TraceRay(
-            SceneBVH, // Acceleration Structure
-            RAY_FLAG_NONE,
-            0xFF,
-            0, // Normal ray type
-            2, // Hit group stride
-            0, // Miss normal ray type 
-            ray,
-            liPayload);
+        TraceRay(
+        SceneBVH, // Acceleration Structure
+        RAY_FLAG_NONE,
+        0xFF,
+        0, // Normal ray type
+        2, // Hit group stride
+        0, // Miss normal ray type 
+        ray,
+        liPayload);
             
-            float n_dot_r = max(dot(ray.Direction, hitNormal), 0);
+        float n_dot_r = max(dot(ray.Direction, hitNormal), 0);
             
-            float3 irradience = liPayload.Li * abs(n_dot_r);
+        float3 irradience = liPayload.Li * abs(n_dot_r);
             
-            payload.Li += bsdf * hitColor * irradience * (2 * PI);
-        }
+        payload.Li += bsdf * hitColor * irradience / px;
     }
 }

@@ -23,6 +23,9 @@ namespace DXRDemo
         {
             int32_t Samples = 50;
             int32_t Bounces = 2;
+            float LightIntensity = 100;
+            bool ImportanceSamplingEnabled = true;
+            float ImportanceSamplingPercentage = 0.7;
         };
 
         void Update();

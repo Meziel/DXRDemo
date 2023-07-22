@@ -22,8 +22,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    const uint32_t width = 800;
-    const uint32_t height = 600;
+    const uint32_t width = 1280;
+    const uint32_t height = 720;
 
     Window window(hInstance, L"DXR Demo", width, height);
 

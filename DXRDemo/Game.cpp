@@ -122,10 +122,32 @@ namespace DXRDemo
         {
             ImGui::Begin("Settings");
 
-            ImGui::SliderInt("Samples", &UserSettings.Samples, 1, 1000);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::SliderInt("Bounces", &UserSettings.Bounces, 1, 10);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SetWindowFontScale(1.5);
+            ImGui::SetWindowSize({0, 0});
+            ImGui::SetWindowPos({10, 10});
+            
+            ImGui::Text("Ray Tracing Enabled: %s", _dxContext.IsRaytracingEnabled() ? "True" : "False");
+            
+            ImGui::SeparatorText("Ray Tracing");
+            ////////////////////////////////////
+            ImGui::SliderInt("Samples", &UserSettings.Samples, 1, 5000);
+            ImGui::SliderInt("Bounces", &UserSettings.Bounces, 1, 10);
+            ImGui::SliderFloat("Light Intensity", &UserSettings.LightIntensity, 0, 1000);        
+            ImGui::Checkbox("Importance Sampling", &UserSettings.ImportanceSamplingEnabled);
+            ImGui::SliderFloat("% Towards Light", &UserSettings.ImportanceSamplingPercentage, 0, 1);
 
-            ImGui::Text("FPS: %.1f", FPS);
+            ImGui::SeparatorText("FPS");
+            ///////////////////////////////
+
+            static float fpsHistogram[100];
+            for (int i = 0; i < 99; ++i)
+            {
+                fpsHistogram[i] = fpsHistogram[i + 1];
+            }
+            fpsHistogram[99] = FPS;
+
+            std::string fpsText = std::format("FPS: {:.02f}", FPS);
+            ImGui::PlotLines(fpsText.c_str(), fpsHistogram, 100);
             ImGui::End();
         }
 
@@ -302,15 +324,15 @@ namespace DXRDemo
         Scene.RootSceneObject = make_shared<GameObject>();
         
         Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\cornell_box_multimaterial\cornell_box_multimaterial.obj)"));
-        //Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\sphere\sphere.obj)"));
+        Scene.RootSceneObject->AddChild(assetImporter.ImportAsset(R"(Content\sphere\sphere.obj)"));
 
-        //auto& sphere = Scene.RootSceneObject->Children.back()->Children.back();
-        //sphere->Transform.Scale *= 10;
-        //sphere->Transform.Position.y = 20;
-        //auto oscillator = std::make_shared<OscillatorComponent>();
-        //oscillator->Radius = 30;
-        //oscillator->Speed = XM_PI / 2;
-        //sphere->AddComponent(oscillator);
+        auto& sphere = Scene.RootSceneObject->Children.back()->Children.back();
+        sphere->Transform.Scale *= 10;
+        sphere->Transform.Position.y = 20;
+        auto oscillator = std::make_shared<OscillatorComponent>();
+        oscillator->Radius = 30;
+        oscillator->Speed = XM_PI / 2;
+        sphere->AddComponent(oscillator);
 
         _CreateDescriptorHeaps();
         _CreateBuffers();

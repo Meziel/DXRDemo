@@ -7,6 +7,9 @@ struct Settings
 {
     int samples;
     int bounces;
+    float lightIntensity;
+    bool importanceSamplingEnabled;
+    float importanceSamplingPercentage;
 };
 
 struct VertexData
