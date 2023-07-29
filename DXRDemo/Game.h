@@ -156,7 +156,9 @@ namespace DXRDemo
         // as the target image
         void CreateRaytracingOutputBuffer();
         void CreateShaderResourceHeap();
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_outputUploadResource;
         Microsoft::WRL::ComPtr<ID3D12Resource> m_outputResource;
+        Microsoft::WRL::ComPtr<ID3D12Resource> m_outputReadbackResource;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvUavHeap;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_guiHeap;
 

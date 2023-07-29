@@ -268,15 +268,6 @@ namespace DXRDemo
 
             // Copy RT output image to render target
 
-            if (DenoisingEnabled)
-            {
-                _fenceValue = directCommandQueue.ExecuteCommandList(directCommandList);
-                directCommandQueue.WaitForFenceValue(_fenceValue);
-                directCommandList = directCommandQueue.GetCommandList();
-
-                _denoiser->Denoise();
-            }
-
             // Transition output from unordered access to copy source
             transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
             directCommandList->ResourceBarrier(1, &transition);
@@ -284,9 +275,67 @@ namespace DXRDemo
             // Transition render target from render target to copy dest
             transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
             directCommandList->ResourceBarrier(1, &transition);
+
+            if (DenoisingEnabled)
+            {
+                D3D12_TEXTURE_COPY_LOCATION srcLocation = {};
+                srcLocation.pResource = m_outputResource.Get();
+                srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                srcLocation.SubresourceIndex = 0; // Assuming you want to copy from the first subresource
+
+                D3D12_TEXTURE_COPY_LOCATION dstLocation = {};
+                dstLocation.pResource = m_outputReadbackResource.Get();
+                dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                dstLocation.PlacedFootprint.Offset = 0;
+                dstLocation.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // Adjust this as necessary
+                dstLocation.PlacedFootprint.Footprint.Width = static_cast<uint32_t>(_viewport.Width);
+                dstLocation.PlacedFootprint.Footprint.Height = static_cast<uint32_t>(_viewport.Height);
+                dstLocation.PlacedFootprint.Footprint.Depth = 1;
+                dstLocation.PlacedFootprint.Footprint.RowPitch = static_cast<uint32_t>(_viewport.Width * 4); // Adjust this as necessary
+
+                directCommandList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
+                //directCommandList->CopyResource(m_outputReadbackResource.Get(), m_outputResource.Get());
+
+                _fenceValue = directCommandQueue.ExecuteCommandList(directCommandList);
+                directCommandQueue.WaitForFenceValue(_fenceValue);
+                directCommandList = directCommandQueue.GetCommandList();
+
+                void* readBack;
+                void* upload;
+                m_outputReadbackResource->Map(0, nullptr, &readBack);
+                m_outputUploadResource->Map(0, nullptr, &upload);
+
+                _denoiser->Denoise(readBack, upload);
+                //memcpy(upload, readBack,
+                //    static_cast<std::size_t>(_viewport.Width)* static_cast<std::size_t>(_viewport.Height) * 4);
+
+                m_outputUploadResource->Unmap(0, nullptr);
+                m_outputReadbackResource->Unmap(0, nullptr);
+
+
+                D3D12_TEXTURE_COPY_LOCATION dstLocation2 = {};
+                dstLocation2.pResource = backBuffer.Get();
+                dstLocation2.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                dstLocation2.SubresourceIndex = 0; // Assuming you want to copy to the first subresource
+
+                D3D12_TEXTURE_COPY_LOCATION srcLocation2 = {};
+                srcLocation2.pResource = m_outputUploadResource.Get();
+                srcLocation2.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                srcLocation2.PlacedFootprint.Offset = 0;
+                srcLocation2.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // Adjust this as necessary
+                srcLocation2.PlacedFootprint.Footprint.Width = static_cast<uint32_t>(_viewport.Width);
+                srcLocation2.PlacedFootprint.Footprint.Height = static_cast<uint32_t>(_viewport.Height);
+                srcLocation2.PlacedFootprint.Footprint.Depth = 1;
+                srcLocation2.PlacedFootprint.Footprint.RowPitch = static_cast<uint32_t>(_viewport.Width * 4); // Adjust this as necessary
+
+                directCommandList->CopyTextureRegion(&dstLocation2, 0, 0, 0, &srcLocation2, nullptr);
+            }
+            else
+            {
+                // Copy raytrace output to render target
+                directCommandList->CopyResource(backBuffer.Get(), m_outputResource.Get());
+            }
             
-            // Copy raytrace output to render target
-            directCommandList->CopyResource(backBuffer.Get(), m_outputResource.Get());
 
             transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),
                 D3D12_RESOURCE_STATE_COPY_DEST,
@@ -365,8 +414,8 @@ namespace DXRDemo
         CreateShaderBindingTable();
 
         _denoiser = std::make_shared<Denoiser>(
-            _dxContext.Device.Get(),
-            m_outputResource.Get()
+            static_cast<std::size_t>(_viewport.Width),
+            static_cast<std::size_t>(_viewport.Height)
             );
 
 
@@ -747,19 +796,41 @@ namespace DXRDemo
         D3D12_RESOURCE_DESC resDesc = {};
         resDesc.DepthOrArraySize = 1;
         resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        // The backbuffer is actually DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, but sRGB formats cannot be used
-        // with UAVs. For accuracy we should convert to sRGB ourselves in the shader
         resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
         resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         resDesc.Width = static_cast<uint64_t>(_viewport.Width);
         resDesc.Height = static_cast<uint64_t>(_viewport.Height);
         resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resDesc.MipLevels = 1;
         resDesc.SampleDesc.Count = 1;
+
+        CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
+        CD3DX12_HEAP_PROPERTIES readbackHeapProps(D3D12_HEAP_TYPE_READBACK);
+
         ThrowIfFailed(_dxContext.Device->CreateCommittedResource(
-            &nv_helpers_dx12::kDefaultHeapProps, D3D12_HEAP_FLAG_SHARED, &resDesc,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_outputResource)));
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &resDesc,
+            D3D12_RESOURCE_STATE_COPY_SOURCE,
+            nullptr,
+            IID_PPV_ARGS(&m_outputResource)));
+
+        D3D12_RESOURCE_DESC resourceDesc = m_outputResource->GetDesc();
+
+        m_outputUploadResource = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(),
+            static_cast<uint64_t>(_viewport.Width) * static_cast<uint64_t>(_viewport.Height) * 4,
+            D3D12_RESOURCE_FLAG_NONE,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            uploadHeapProps);
+
+        m_outputReadbackResource = nv_helpers_dx12::CreateBuffer(_dxContext.Device.Get(),
+            static_cast<uint64_t>(_viewport.Width) * static_cast<uint64_t>(_viewport.Height) * 4,
+            D3D12_RESOURCE_FLAG_NONE,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            readbackHeapProps);
+
+
     }
 
     void Game::CreateShaderResourceHeap()
