@@ -397,5 +397,8 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-# Conten
+# Content
 !DXRDemo/Content/**/*.obj
+
+!/ThirdParty/oidn-2.0.1.x64.windows/**/*.*
+!/ThirdParty/oidn-2.0.1.x64.windows/bin/

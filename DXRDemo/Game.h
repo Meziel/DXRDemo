@@ -10,6 +10,7 @@
 #include "MeshRenderer.h"
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
+#include "Denoiser.h"
 
 namespace DXRDemo
 {
@@ -21,7 +22,7 @@ namespace DXRDemo
 
         struct Settings
         {
-            int32_t Samples = 50;
+            int32_t Samples = 10;
             int32_t Bounces = 2;
             float LightIntensity = 100;
             bool ImportanceSamplingEnabled = true;
@@ -37,12 +38,15 @@ namespace DXRDemo
 
         double FPS = 0;
         Settings UserSettings;
+        bool DenoisingEnabled = true;
 
     private:
 
         Window* _window;
         DXContext _dxContext;
-        std::vector<uint64_t> _fenceValues;
+        //std::vector<uint64_t> _fenceValues;
+        uint64_t _fenceValue = 0;
+        std::shared_ptr<Denoiser> _denoiser;
 
         void _OnInit();
         void _CreateBuffers();

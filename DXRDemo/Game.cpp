@@ -31,7 +31,7 @@ namespace DXRDemo
             assert("Raytracing not supported on device");
         }
 
-        _fenceValues.resize(_dxContext.GetNumberBuffers());
+        //_fenceValues.resize(_dxContext.GetNumberBuffers());
         _OnInit();
     }
 
@@ -136,6 +136,7 @@ namespace DXRDemo
             ImGui::SliderFloat("Light Intensity", &UserSettings.LightIntensity, 0, 1000);        
             ImGui::Checkbox("Importance Sampling", &UserSettings.ImportanceSamplingEnabled);
             ImGui::SliderFloat("% Towards Light", &UserSettings.ImportanceSamplingPercentage, 0, 1);
+            ImGui::Checkbox("Denoising", &DenoisingEnabled);
 
             ImGui::SeparatorText("FPS");
             ///////////////////////////////
@@ -162,19 +163,15 @@ namespace DXRDemo
         auto rtv = _dxContext.GetCurrentRenderTargetView();
         auto dsv = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
 
-        directCommandList->SetGraphicsRootSignature(_rootSignature.Get());
         directCommandList->RSSetViewports(1, &_viewport);
         directCommandList->RSSetScissorRects(1, &_scissorRect);
-
         directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
-
-        // Set descriptor heap
-        std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
-        directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
 
         // Raster
         if (!_dxContext.IsRaytracingEnabled())
         {
+            directCommandList->SetGraphicsRootSignature(_rootSignature.Get());
+
             // Indicate that the back buffer will be used as a render target
             _TransitionResource(directCommandList, backBuffer,
                 D3D12_RESOURCE_STATE_PRESENT,
@@ -214,6 +211,10 @@ namespace DXRDemo
         // Ray tracing
         else
         {
+            // Set descriptor heap
+            std::vector<ID3D12DescriptorHeap*> heaps = { m_srvUavHeap.Get() };
+            directCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+
             // Update acceleration structures
             int instanceNumber = 0;
             Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, &instanceNumber](MeshRenderer& meshRenderer, size_t index)
@@ -267,10 +268,19 @@ namespace DXRDemo
 
             // Copy RT output image to render target
 
+            if (DenoisingEnabled)
+            {
+                _fenceValue = directCommandQueue.ExecuteCommandList(directCommandList);
+                directCommandQueue.WaitForFenceValue(_fenceValue);
+                directCommandList = directCommandQueue.GetCommandList();
+
+                _denoiser->Denoise();
+            }
+
             // Transition output from unordered access to copy source
             transition = CD3DX12_RESOURCE_BARRIER::Transition(m_outputResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
             directCommandList->ResourceBarrier(1, &transition);
-            
+
             // Transition render target from render target to copy dest
             transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
             directCommandList->ResourceBarrier(1, &transition);
@@ -284,16 +294,23 @@ namespace DXRDemo
             directCommandList->ResourceBarrier(1, &transition);
         }
 
+        directCommandList->RSSetViewports(1, &_viewport);
+        directCommandList->RSSetScissorRects(1, &_scissorRect);
+        directCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
         std::vector<ID3D12DescriptorHeap*> uiHeaps = { m_guiHeap.Get() };
         directCommandList->SetDescriptorHeaps(static_cast<UINT>(uiHeaps.size()), uiHeaps.data());
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directCommandList.Get());
 
         // Present
-         _fenceValues[_dxContext.GetCurrentBackBufferIndex()] = directCommandQueue.ExecuteCommandList(directCommandList);
-         _dxContext.Present();
-         directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext.GetCurrentBackBufferIndex()]);
+        _fenceValue = directCommandQueue.ExecuteCommandList(directCommandList);
+        directCommandQueue.WaitForFenceValue(_fenceValue);
+
+
+        _dxContext.Present();
+        //directCommandQueue.WaitForFenceValue(_fenceValues[_dxContext.GetCurrentBackBufferIndex()]);
     
-         //while (true) {}
+        //while (true) {}
     }
 
     void Game::OnKeyUp(uint8_t key)
@@ -346,6 +363,12 @@ namespace DXRDemo
         CreateRaytracingOutputBuffer();
         CreateShaderResourceHeap();
         CreateShaderBindingTable();
+
+        _denoiser = std::make_shared<Denoiser>(
+            _dxContext.Device.Get(),
+            m_outputResource.Get()
+            );
+
 
         _InitializeGUI();
     }
@@ -564,7 +587,7 @@ namespace DXRDemo
             // Gather all the instances into the builder helper
             for (size_t i = 0; i < instances.size(); i++)
             {
-                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(2 * i));
+                TopLevelASGenerator.AddInstance(instances[i].first.Get(), instances[i].second, static_cast<uint32_t>(i), static_cast<uint32_t>(i));
             }
             // As for the bottom-level AS, the building the AS requires some scratch space
             // to store temporary data in addition to the actual AS. In the case of the
@@ -677,12 +700,6 @@ namespace DXRDemo
         return rsc.Generate(_dxContext.Device.Get(), true);
     }
 
-    ComPtr<ID3D12RootSignature> Game::CreateShadowSignature()
-    {
-        nv_helpers_dx12::RootSignatureGenerator rsc;
-        return rsc.Generate(_dxContext.Device.Get(), true);
-    }
-
     ComPtr<ID3D12RootSignature> Game::CreateMissSignature()
     {
         nv_helpers_dx12::RootSignatureGenerator rsc;
@@ -698,27 +715,22 @@ namespace DXRDemo
         m_rayGenSignature = CreateRayGenSignature();
         m_missSignature = CreateMissSignature();
         m_hitSignature = CreateHitSignature();
-        m_shadowSignature = CreateShadowSignature();
 
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//RayGen.cso", &m_rayGenLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Miss.cso", &m_missLibrary));
         ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//Hit.cso", &m_hitLibrary));
-        ThrowIfFailed(D3DReadFileToBlob(L"..//x64//Debug//ShadowRay.cso", &m_shadowLibrary));
 
         nv_helpers_dx12::RayTracingPipelineGenerator pipeline(_dxContext.Device.Get());
 
         pipeline.AddLibrary(m_rayGenLibrary.Get(), { L"RayGen" });
         pipeline.AddLibrary(m_missLibrary.Get(), { L"Miss" });
         pipeline.AddLibrary(m_hitLibrary.Get(), { L"ClosestHit" });
-        pipeline.AddLibrary(m_shadowLibrary.Get(), { L"ShadowClosestHit", L"ShadowMiss"});
 
         pipeline.AddHitGroup(L"HitGroup", L"ClosestHit");
-        pipeline.AddHitGroup(L"ShadowHitGroup", L"ShadowClosestHit");
 
         pipeline.AddRootSignatureAssociation(m_rayGenSignature.Get(), {L"RayGen"});
         pipeline.AddRootSignatureAssociation(m_missSignature.Get(), {L"Miss"});
         pipeline.AddRootSignatureAssociation(m_hitSignature.Get(), {L"HitGroup"});
-        pipeline.AddRootSignatureAssociation(m_shadowSignature.Get(), {L"ShadowHitGroup", L"ShadowMiss"});
 
         pipeline.SetMaxPayloadSize(16 * sizeof(float)); // RGB + distance
 
@@ -746,7 +758,7 @@ namespace DXRDemo
         resDesc.MipLevels = 1;
         resDesc.SampleDesc.Count = 1;
         ThrowIfFailed(_dxContext.Device->CreateCommittedResource(
-            &nv_helpers_dx12::kDefaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc,
+            &nv_helpers_dx12::kDefaultHeapProps, D3D12_HEAP_FLAG_SHARED, &resDesc,
             D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_outputResource)));
     }
 
@@ -784,7 +796,6 @@ namespace DXRDemo
             heapPointer
         });
         m_sbtHelper.AddMissProgram(L"Miss", { reinterpret_cast<void*>(_clearColorBuffer->GetGPUVirtualAddress()) });
-        m_sbtHelper.AddMissProgram(L"ShadowMiss", {});
         
         Scene.RootSceneObject->ForEachComponent<MeshRenderer>([this, heapPointer](const MeshRenderer& meshRenderer, size_t index)
             {
@@ -796,7 +807,6 @@ namespace DXRDemo
                         reinterpret_cast<void*>(_settingsViewBuffer->GetGPUVirtualAddress()),
                         heapPointer
                     });
-                    m_sbtHelper.AddHitGroup(L"ShadowHitGroup", {});
                 }
                 return false;
             });
